@@ -1,0 +1,11 @@
+*.ckpt
+*.pth
+*.pt
+**/BSDS500/
+**/__pycache__/
+**/*.png
+**/*.jpg
+**/*.jpeg
+**/Unrolling_comparison/
+**/DATA/
+**/*.h5
