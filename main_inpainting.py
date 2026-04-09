@@ -138,13 +138,14 @@ test_dataloader = DataLoader(test_dataset, batch_size=20, shuffle=False)
 # Paramètres (facilement modifiables)
 # ------------------------------------------------------------------------------
 DC_type = 'grad'
-lambda_Rthetas = np.logspace(-1.0, 1.0, num=5).tolist()
+lambda_Rthetas = np.logspace(-1.0, 1.0, num=10).tolist()
 Network = 'DRUNet'
 mode = True  # True pour entraînement accéléré, False pour entraînement complet
 max_iter = 500
 backtracking = False
-sigma_denoising = np.linspace(0.01, 0.1, 5).tolist()
+sigma_denoising = np.linspace(0.01, 0.1, num=10).tolist()
 n_iter_init = [20]
+
 
 
 for lambda_Rtheta, sigma_denoiser, n_iter in product(lambda_Rthetas, sigma_denoising, n_iter_init):
@@ -223,7 +224,7 @@ for lambda_Rtheta, sigma_denoiser, n_iter in product(lambda_Rthetas, sigma_denoi
     if test:
         dict = model.evaluate(
             test_loader=val_dataloader,
-            n_display=7,
+            n_display=2,
             accelerated=mode,
             init_train=init_train,
             pretrained_path=pretrained_path,
@@ -269,18 +270,18 @@ with open("Unrolling_comparison/inpainting/best_model_grad.txt", "w") as f:
 # Paramètres (facilement modifiables)
 # ------------------------------------------------------------------------------
 DC_type = 'prox'
-lambda_Rthetas = np.linspace(1., 10., num=5).tolist()
+lambda_Rthetas = np.linspace(1., 10., num=10).tolist()
 Network = 'DRUNet'
 mode = True  # True pour entraînement accéléré, False pour entraînement complet
 max_iter = 200
 backtracking = False
-sigma_denoising = np.linspace(0.01, 0.1, 5).tolist()
+sigma_denoising = np.linspace(0.01, 0.1, num=10).tolist()
 n_iter_init = [20]
 
 
 for lambda_Rtheta, sigma_denoiser, n_iter in product(lambda_Rthetas, sigma_denoising, n_iter_init):
 
-    lambda_dc = 5.
+    lambda_dc = 0.5
     # ------------------------------------------------------------------------------
     # Dossier pour sauvegarde et paramètres du modèle
     # ------------------------------------------------------------------------------
@@ -354,7 +355,7 @@ for lambda_Rtheta, sigma_denoiser, n_iter in product(lambda_Rthetas, sigma_denoi
     if test:
         dict = model.evaluate(
             test_loader=val_dataloader,
-            n_display=7,
+            n_display=2,
             accelerated=mode,
             init_train=init_train,
             pretrained_path=pretrained_path,

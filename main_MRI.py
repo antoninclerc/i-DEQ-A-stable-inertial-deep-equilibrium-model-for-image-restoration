@@ -80,12 +80,12 @@ val_dataloader = DataLoader(val_dataset, batch_size=10, shuffle=False)
 test_dataloader = DataLoader(test_dataset, batch_size=20, shuffle=False)
 
 DC_type = 'grad'
-lambda_Rthetas = np.logspace(-1.0, 1.0, num=5).tolist() # 10 valeurs de lambda_Rtheta entre 0.1 et 10
+lambda_Rthetas = np.logspace(-1.0, 0., num=10).tolist() # 10 valeurs de lambda_Rtheta entre 0.1 et 10
 Network = 'DRUNet'
 accelerated = True
 max_iter = 200
 backtracking = False
-sigma_denoising = np.linspace(0.01, 0.1, 5).tolist()
+sigma_denoising = np.linspace(0.01, 0.1, num=10).tolist()
 lambda_dcs = [0.5]
 init_trains = [True, False]
 
@@ -152,7 +152,7 @@ for lambda_Rtheta, sigma_denoiser, lambda_dc, init_train in product(lambda_Rthet
 
     test = True
     if test:
-        dict = model.evaluate(test_loader=val_dataloader, n_display=7, accelerated=accelerated, init_train=init_train_params, pretrained_path=pretrained_path, PnP=False)
+        dict = model.evaluate(test_loader=val_dataloader, n_display=2, accelerated=accelerated, init_train=init_train_params, pretrained_path=pretrained_path, PnP=False)
 
     test_mse = dict["test_mse"]
     test_PSNR = dict["test_PSNR"]
@@ -193,12 +193,12 @@ with open("Unrolling_comparison/rician/best_model_grad.txt", "w") as f:
 # Paramètres (facilement modifiables)
 # ------------------------------------------------------------------------------
 DC_type = 'prox'
-lambda_Rthetas = np.linspace(-1., 1., num=5).tolist()
+lambda_Rthetas = np.linspace(-1., 0., num=10).tolist()
 Network = 'DRUNet'
 accelerated = True  # True pour entraînement accéléré, False pour entraînement complet
 max_iter = 200
 backtracking = False
-sigma_denoising = np.linspace(0.01, 0.1, 5).tolist()
+sigma_denoising = np.linspace(0.01, 0.1, num=10).tolist()
 lambda_dc = [1.0]
 init_trains = [True, False]
 
@@ -264,7 +264,7 @@ for lambda_Rtheta, sigma_denoiser, lambda_dc, init_train in product(lambda_Rthet
         
     test = True
     if test:
-        dict = model.evaluate(test_loader=val_dataloader, n_display=7, accelerated=accelerated, init_train=init_train_params, pretrained_path=pretrained_path, PnP=False)
+        dict = model.evaluate(test_loader=val_dataloader, n_display=2, accelerated=accelerated, init_train=init_train_params, pretrained_path=pretrained_path, PnP=False)
 
     test_mse = dict["test_mse"]
     test_PSNR = dict["test_PSNR"]

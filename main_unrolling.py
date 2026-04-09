@@ -102,7 +102,7 @@ for DC, max_iter, noise in product(DC_types, max_iters, noises):
                 lambda_dc=lambda_dc, learn_lambda_dc=True,
                 max_iter=max_iter, 
                 device=device, path_folder=path_folder, 
-                sigma_noise=noise)
+                sigma_noise=noise, use_noise=True, sigma_denoiser=0.1)
 
     # -------------------------------------------------------------------------------
     # Entraînement

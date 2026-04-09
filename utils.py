@@ -231,6 +231,7 @@ def one_step(image, obs, mask,
     gradR = lambda_Rtheta * nabla_R(image)
 
     if DC_type == 'prox':
+        image = image - lambda_dc * gradR
         if noise_type == 'gaussian':
             image = DC(image, obs, mask, lambda_dc)
         else:

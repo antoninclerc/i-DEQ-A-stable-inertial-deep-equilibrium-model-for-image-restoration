@@ -39,7 +39,7 @@ def Adjoint_MRI(k0, mask):
 def DC_prox_inpainting(image, image_obs, mask, lambda_dc=1.):
 
     n_ch = image.shape[1]
-    lambda_dc = 1 / lambda_dc
+    lambda_dc = 1/lambda_dc
 
     if mask.shape[1] != n_ch:
         mask_nch = torch.stack([mask] * n_ch, dim=1)
@@ -53,7 +53,8 @@ def DC_prox_inpainting(image, image_obs, mask, lambda_dc=1.):
     denom = mask_nch + lambda_dc
 
     x_dc_nch = rhs / denom
-
+    print(torch.norm(x_dc_nch - image))
+    raise NotImplementedError("DC_prox_inpainting is not implemented yet.")
     return x_dc_nch
 
 def DC_grad_inpainting(image, image_obs, mask, lambda_dc=1.):

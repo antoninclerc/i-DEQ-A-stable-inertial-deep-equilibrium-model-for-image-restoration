@@ -482,6 +482,7 @@ class DeepEquilibrium(nn.Module):
                 B = batch_input.shape[0]
 
                 noise = torch.full((B, 1, 1, 1), self.sigma_noise, device=self.device)
+                
                 if self.noise_type == 'gaussian':
                     batch_input = batch_input + noise * torch.randn_like(batch_input)
                 

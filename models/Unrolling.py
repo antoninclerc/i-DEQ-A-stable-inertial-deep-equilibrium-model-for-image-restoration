@@ -54,6 +54,8 @@ class Unrolling(nn.Module):
                  device='cpu',
                  path_folder=None,
                  sigma_noise=0.0,
+                 sigma_denoiser=0.1,
+                 use_noise=False
                  ):
 
         super(Unrolling, self).__init__()
@@ -81,6 +83,8 @@ class Unrolling(nn.Module):
         # -----------------------------
         self.max_iter = max_iter
         self.sigma_noise = sigma_noise
+        self.sigma_denoiser = sigma_denoiser
+        self.use_noise = use_noise
 
         # -----------------------------
         # Directory for models
@@ -117,7 +121,10 @@ class Unrolling(nn.Module):
         else:
             x_in = x
        
-        x_out = self.Network(x_in, self.sigma_noise)
+        if self.use_noise:
+            x_out = self.Network(x_in, self.sigma_denoiser)
+        else:
+            x_out = self.Network(x_in)
         
         if self.problem == "MRI":
             x_out = add_zero_channel(x_out)  # Add zero imaginary part
