@@ -486,16 +486,16 @@ class DeepEquilibrium(nn.Module):
                 if self.noise_type == 'gaussian':
                     batch_input = batch_input + noise * torch.randn_like(batch_input)
                 
-                batch_input = torch.clamp(batch_input, 0, 1.0)
-                
                 batch_mask = batch_mask["mask"].to(self.device).float()
                 if self.problem == "MRI":
-                    batch_input = batch_input * batch_mask  # Ensure masked input is consistent in k-space for MRI
+                    batch_input = batch_input * batch_mask  # Ensure masked input is consistent in k-space
+                else:
+                    batch_input = torch.clamp(batch_input, 0, 1.0)  # Ensure input is in valid range
 
-                batch_target = batch_target.to(self.device).float()
+                batch_target = batch_target.to(self.device).float()  
 
                 epoch_iter_nums = []
-                epoch_iter_nums_val = []
+                epoch_iter_nums_val = []            
 
                 outputs, _, stats = self.forward(batch_input, batch_mask)
                 
@@ -567,20 +567,21 @@ class DeepEquilibrium(nn.Module):
                 for batch_target, batch_input, batch_mask in val_loader:
 
                     batch_input = batch_input.to(self.device).float()
-                    
+
                     B = batch_input.shape[0]
 
-                    noise = torch.full((B,1,1,1), self.sigma_noise, device=self.device)
+                    noise = torch.full((B, 1, 1, 1), self.sigma_noise, device=self.device)
+                    
                     if self.noise_type == 'gaussian':
                         batch_input = batch_input + noise * torch.randn_like(batch_input)
-
-                    batch_input = torch.clamp(batch_input, 0, 1.0)  # Ensure input is in valid range
-
+                    
                     batch_mask = batch_mask["mask"].to(self.device).float()
                     if self.problem == "MRI":
                         batch_input = batch_input * batch_mask  # Ensure masked input is consistent in k-space
+                    else:
+                        batch_input = torch.clamp(batch_input, 0, 1.0)  # Ensure input is in valid range
 
-                    batch_target = batch_target.to(self.device).float()
+                    batch_target = batch_target.to(self.device).float()  
 
                     outputs, _, stats = self.forward(batch_input, batch_mask)
                         

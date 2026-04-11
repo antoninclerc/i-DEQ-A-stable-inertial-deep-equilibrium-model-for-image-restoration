@@ -283,7 +283,7 @@ def backtracking(x, y, f, gradf, R, gradR, tau0, lambda_Rtheta, gamma, eta):
             Phi_try = Phi(Tx_try, y)
 
             armijo_rhs = Phix - gamma * tau * grad_norm_sq
-            print(Phi_try, armijo_rhs, end="\r")
+            # print(Phi_try, armijo_rhs, end="\r")
             condition = Phi_try <= armijo_rhs
 
             for i, idx in enumerate(active_idx):
@@ -298,6 +298,7 @@ def backtracking(x, y, f, gradf, R, gradR, tau0, lambda_Rtheta, gamma, eta):
             n_iter += 1
             if n_iter > 100:
                 print("Warning: backtracking exceeded 100 iterations")
+                raise RuntimeError("Backtracking line search did not converge after 100 iterations")
                 break
 
     # étape finale différentiable
@@ -341,22 +342,22 @@ def prox_backtracking(
             #print('norm xk et zk:', torch.norm(xk), torch.norm(zk))
             #print('lambda_Rtheta:', lambda_Rtheta)
             #print('tau min, max:', tau.view(-1,1,1,1).min().item(), tau.view(-1,1,1,1).max().item())
-            print('Fxk:', Fxk)
-            print('Fzk:', F(zk, y))
+            # print('Fxk:', Fxk)
+            # print('Fzk:', F(zk, y))
 
             x_next = prox_f(zk, y, tau)
             Fx_next = F(x_next, y)
 
             #print('x_next min, max:', x_next.min().item(), x_next.max().item())
             #print('norm x_next:', torch.norm(x_next))
-            print('Fx_next:', Fx_next)
+            # print('Fx_next:', Fx_next)
             #raise Exception("Debug stop")
 
             lhs = Fxk - Fx_next
             rhs = gamma / tau * torch.sum((xk - x_next)**2, dim=(1,2,3))
 
-            print('lhs:', lhs)
-            print('rhs:', rhs)
+            # print('lhs:', lhs)
+            # print('rhs:', rhs)
 
             condition = lhs >= rhs
 
@@ -826,13 +827,14 @@ def jacobian_free_backpropagation(
     v = g
     acc = g
 
-    for _ in range(K_JFB):
-        v = torch.autograd.grad(
-            fz, z,
-            grad_outputs=v,
-            retain_graph=True,
-            allow_unused=False
-        )[0]
+    if K_JFB > 0:
+        for _ in range(K_JFB):
+            v = torch.autograd.grad(
+                fz, z,
+                grad_outputs=v,
+                retain_graph=True,
+                allow_unused=False
+            )[0]
 
         acc = acc + v
 

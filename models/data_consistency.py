@@ -53,8 +53,7 @@ def DC_prox_inpainting(image, image_obs, mask, lambda_dc=1.):
     denom = mask_nch + lambda_dc
 
     x_dc_nch = rhs / denom
-    print(torch.norm(x_dc_nch - image))
-    raise NotImplementedError("DC_prox_inpainting is not implemented yet.")
+
     return x_dc_nch
 
 def DC_grad_inpainting(image, image_obs, mask, lambda_dc=1.):
@@ -78,6 +77,5 @@ def DC_grad_Rician(image, image_obs, sigma, lambda_dc=1.):
     return image - lambda_dc * grad
 
 def DC_prox_Rician(image, image_obs, sigma, lambda_dc=1., max_iter=10):
-    lambda_dc = 1 / lambda_dc
     return fast_irl1(image, image_obs, sigma, lambda_dc, max_iter)
 

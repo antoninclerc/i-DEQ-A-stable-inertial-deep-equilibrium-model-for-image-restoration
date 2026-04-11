@@ -1,0 +1,2 @@
+Best model path: Unrolling_comparison/rician/DC_prox_lambda_Rtheta_500.0_sigma_denoiser_0.04000000000000001_n_iter_init_20_lambda_dc_0.0005_init_train_True
+Best PSNR: 29.303993618156333
