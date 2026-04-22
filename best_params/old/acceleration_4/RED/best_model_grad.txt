@@ -1,0 +1,2 @@
+Best model path: Unrolling_comparison/MRI/acceleration_4/grad_lambda_Rtheta_3.00_sigma_0.05_init_train_False
+Best PSNR: 27.289891216874253

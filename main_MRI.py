@@ -3,12 +3,11 @@ import random
 import numpy as np
 
 # Forcer PyTorch à n'utiliser qu'un seul GPU
-os.environ["CUDA_VISIBLE_DEVICES"] = "0"  # seul le GPU 0 sera visible
+os.environ["CUDA_VISIBLE_DEVICES"] = "1"  # seul le GPU 0 sera visible
 device = "cuda:0"
 
 import deepinv as dinv
 import torch
-import torchvision
 from torch.utils.data import DataLoader
 from deepinv.datasets import FastMRISliceDataset
 from itertools import product
@@ -31,7 +30,7 @@ rng = torch.Generator(device=device).manual_seed(seed)
 # ------------------------------------------------------------
 # Construction des DataLoaders avec Data_Transform et filtrage
 # ------------------------------------------------------------
-acceleration = 4
+acceleration = 8
 img_size = (320, 320)
 root = "DATA/singlecoil_train"
 dataset = FastMRISliceDataset(root=root, slice_index="middle")
@@ -53,202 +52,412 @@ mask = physics_generator.step()["mask"]
 physics = dinv.physics.MRI(mask=mask, img_size=img_size, device=device)
 
 dataset_path = dinv.datasets.generate_dataset(
-    train_dataset=train_subset,
-    test_dataset=test_subset,
-    val_dataset=val_subset,
-    physics=physics,
-    physics_generator=physics_generator,
-    save_physics_generator_params=True,
-    overwrite_existing=False,
-    device=device,
-    save_dir='datasets/acceleration_{}'.format(acceleration),
-    batch_size=4,
-)
+        train_dataset=train_subset,
+        test_dataset=test_subset,
+        val_dataset=val_subset,
+        physics=physics,
+        physics_generator=physics_generator,
+        save_physics_generator_params=True,
+        overwrite_existing=True,
+        device=device,
+        save_dir='datasets/acceleration_{}'.format(acceleration),
+        batch_size=4,
+    )
 
 train_dataset = dinv.datasets.HDF5Dataset(
-    dataset_path, split="train", load_physics_generator_params=True
-)
+        dataset_path, split="train", load_physics_generator_params=True
+    )
 test_dataset = dinv.datasets.HDF5Dataset(
-    dataset_path, split="test", load_physics_generator_params=True
-)
+        dataset_path, split="test", load_physics_generator_params=True
+    )
 val_dataset = dinv.datasets.HDF5Dataset(
-    dataset_path, split="val", load_physics_generator_params=True
-)
+        dataset_path, split="val", load_physics_generator_params=True
+    )
 
 train_dataloader = DataLoader(train_dataset, batch_size=20, shuffle=True)
 val_dataloader = DataLoader(val_dataset, batch_size=10, shuffle=False)
 test_dataloader = DataLoader(test_dataset, batch_size=20, shuffle=False)
 
-DC_type = 'grad'
-lambda_Rthetas = np.logspace(-1.0, 0., num=10).tolist() # 10 valeurs de lambda_Rtheta entre 0.1 et 10
-Network = 'DRUNet'
-accelerated = True
-max_iter = 200
-backtracking = False
-sigma_denoising = np.linspace(0.01, 0.1, num=10).tolist()
-lambda_dcs = [0.5]
-init_trains = [True, False]
+# DC_type = 'grad'
+# lambda_Rthetas = (5*np.logspace(-1, 0, num=10)).tolist() # 10 valeurs de lambda_Rtheta entre 0.1 et 10
+# # lambda_Rthetas = [1.] # PnP
+# accelerateds = [False, True]
+# max_iter = 200
+# backtracking = False
+# sigma_denoising = np.linspace(0.01, 0.05, num=5).tolist()
+# noise_level = 1./255
+# init_train = False
 
-for lambda_Rtheta, sigma_denoiser, lambda_dc, init_train in product(lambda_Rthetas, sigma_denoising, lambda_dcs, init_trains):
+# for lambda_Rtheta, sigma_denoiser, accelerated in product(lambda_Rthetas, sigma_denoising, accelerateds):
+# # for sigma_denoiser, init_train in product(sigma_denoising, init_trains):
+#     lambda_dc = min(0.5, 0.5/lambda_Rtheta)  # lambda_dc dépend de lambda_Rtheta pour éviter des valeurs trop grandes
+#     # lambda_dc = 1. # PnP
+#     # lambda_Rtheta = 1. # PnP
+#     # -------------------------------------------------------------------------------
+#     # Dossier pour sauvegarde et paramètres du modèle
+#     # -------------------------------------------------------------------------------
     
-    # -------------------------------------------------------------------------------
-    # Dossier pour sauvegarde et paramètres du modèle
-    # -------------------------------------------------------------------------------
+#     path_folder = "Unrolling_comparison/MRI/sigma1255/acceleration_{}/accelerated_{}/grad_lambda_Rtheta_{:.2f}_sigma_{:.2f}".format(
+#       acceleration, accelerated, lambda_Rtheta, sigma_denoiser)
+#     # path_folder = "Unrolling_comparison/MRI/PnP/acceleration_{}/grad_sigma_{:.2f}_init_train_{}".format(
+#     #     acceleration, sigma_denoiser, init_train)
+#     os.makedirs(path_folder, exist_ok=True)
     
-    path_folder = "Unrolling_comparison/MRI/acceleration_{}/lambda_Rtheta_{:.2f}_sigma_{:.3f}_lambda_dc_{:.2f}".format(
-        acceleration, lambda_Rtheta, sigma_denoiser, lambda_dc)
-    os.makedirs(path_folder, exist_ok=True)
+#     CNNBlock_model = GSDRUNet(in_channels=1, out_channels=1, pretrained='networks/GSDRUNet_grayscale_torch.ckpt')
+
+#     model = DeepEquilibrium(
+#                 Network=CNNBlock_model, 
+#                 problem="MRI",
+#                 DC_type=DC_type,
+#                 backtracking=backtracking, 
+#                 lambda_dc=lambda_dc, lambda_Rtheta=lambda_Rtheta,
+#                 learn_lambda_dc=False, learn_lambda_Rtheta=True,
+#                 gamma=0.1, eta=0.5,
+#                 thresh=1e-4, max_iter=max_iter, 
+#                 device=device, path_folder=path_folder, 
+#                 sigma_noise=noise_level,
+#                 sigma_denoiser=sigma_denoiser,
+#                 theta_interpol=0.2,
+#                 restart=True,
+#                 B_restart=5000,
+#                 learn_theta_interpol=False,
+#                 learn_B_restart=False)
+
+#     # -------------------------------------------------------------------------------
+#     # Entraînement
+#     # -------------------------------------------------------------------------------
+#     if init_train:
+#         init_train_params = {"epoch_pretraining" : 20, "sigma_pretraining" : 0.2}
+#     else:
+#         init_train_params = None
+
+#     pretrained_path = None
+#     train = False
+#     if train:
+#         model.train_model(
+#             train_loader=train_dataloader,
+#             val_loader=val_dataloader,
+#             accelerated=accelerated,
+#             JFB=True,
+#             K_JFB=0,
+#             lr=1e-5,
+#             eta_k=None,
+#             eta_TV=None,
+#             eta_l1=None,
+#             optimizer=torch.optim.Adam,
+#             optimizer_kwargs={"betas": (0.9, 0.999)},
+#             scheduler=None,
+#             scheduler_kwargs=None,
+#             max_patience=25,
+#             max_epochs=1000,
+#             plot_interval=1,
+#             pretrained_path=pretrained_path)
+
+#     test = True
+#     if test:
+#         dict = model.evaluate(test_loader=val_dataloader, n_display=2, accelerated=accelerated, init_train=init_train_params, pretrained_path=pretrained_path, PnP=False)
+
+#         test_mse = dict["test_mse"]
+#         test_PSNR = dict["test_PSNR"]
+#         input_mse = dict["input_mse"]
+#         input_PSNR = dict["input_PSNR"]
+
+#         # On sauvegarde les paramètres et les résultats dans un fichier texte
+#         with open(os.path.join(path_folder, "results.txt"), "w") as f:
+#             f.write(f"DC_type: {DC_type}\n")
+#             f.write(f"lambda_Rtheta: {lambda_Rtheta}\n")
+#             f.write(f"sigma_denoiser: {sigma_denoiser}\n")
+#             f.write(f"test_mse: {test_mse}\n")
+#             f.write(f"test_PSNR: {test_PSNR}\n")
+#             f.write(f"input_mse: {input_mse}\n")
+#             f.write(f"input_PSNR: {input_PSNR}\n")
+
+# for accelerated in accelerateds:
+
+#     # recherche du meilleur modèle (en fonction du PSNR) parmi tous les modèles entraînés
+#     best_PSNR = -float('inf')
+#     best_model_path = None
+#     for lambda_Rtheta, sigma_denoiser in product(lambda_Rthetas, sigma_denoising):
+#         path_folder = "Unrolling_comparison/MRI/sigma1255/acceleration_{}/accelerated_{}/grad_lambda_Rtheta_{:.2f}_sigma_{:.2f}".format(
+#         acceleration, accelerated, lambda_Rtheta, sigma_denoiser)
+#         # path_folder = "Unrolling_comparison/MRI/PnP/acceleration_{}/grad_sigma_{:.2f}_init_train_{}".format(
+#         #     acceleration, sigma_denoiser, init_train)
+#         with open(os.path.join(path_folder, "results.txt"), "r") as f:
+#             lines = f.readlines()
+#             for line in lines:
+#                 if line.startswith("test_PSNR:"):
+#                     PSNR = float(line.split(":")[1].strip())
+#                     if PSNR > best_PSNR:
+#                         best_PSNR = PSNR
+#                         best_model_path = path_folder
+
+#     # On écrit le meilleur modèle dans un fichier texte
+#     with open("Unrolling_comparison/MRI/sigma1255/acceleration_{}/accelerated_{}/best_model_grad.txt".format(acceleration, accelerated), "w") as f:
+#         f.write(f"Best model path: {best_model_path}\n")
+#         f.write(f"Best PSNR: {best_PSNR}\n")
+
+# # ------------------------------------------------------------------------------
+# # Paramètres (facilement modifiables)
+# # ------------------------------------------------------------------------------
+# DC_type = 'prox'
+# lambda_Rthetas = (5*np.logspace(-1, 0, num=10)).tolist() # 10 valeurs de lambda_Rtheta entre 0.1 et 10
+# # lambda_Rthetas = [1.] # PnP
+# accelerateds = [True, False]  # True pour entraînement accéléré, False pour entraînement complet
+# max_iter = 300
+# backtracking = False
+# sigma_denoising = np.linspace(0.01, 0.05, num=5).tolist()
+# noise_level = 1./255
+# init_train = False
+# lambdas_dc = (np.logspace(-4, -2, num=10)).tolist() # 10 valeurs de lambda_dc entre 0.01 et 1
+
+# for lambda_Rtheta, sigma_denoiser, accelerated in product(lambda_Rthetas, sigma_denoising, accelerateds):
+# # for sigma_denoiser, init_train, lambda_dc in product(sigma_denoising, init_trains, lambdas_dc):
+#     # -------------------------------------------------------------------------------
+#     # Dossier pour sauvegarde et paramètres du modèle
+#     # -------------------------------------------------------------------------------
+#     lambda_dc = min(1., 1./lambda_Rtheta)  # lambda_dc dépend de lambda_Rtheta pour éviter des valeurs trop grandes
+#     # lambda_Rtheta = 1. # PnP
+#     path_folder = "Unrolling_comparison/MRI/sigma1255/acceleration_{}/accelerated_{}/prox_lambda_Rtheta_{:.2f}_sigma_{:.2f}".format(
+#         acceleration, accelerated, lambda_Rtheta, sigma_denoiser)
+#     # path_folder = "Unrolling_comparison/MRI/PnP/acceleration_{}/prox_sigma_{:.2f}_init_train_{}_lambda_dc_{:.5f}".format(
+#     #     acceleration, sigma_denoiser, init_train, lambda_dc)
+#     os.makedirs(path_folder, exist_ok=True)
     
-    if Network == 'DRUNet':
-        CNNBlock_model = GSDRUNet(in_channels=1, out_channels=1, pretrained='networks/GSDRUNet_grayscale_torch.ckpt')
 
-    model = DeepEquilibrium(
-                Network=CNNBlock_model, 
-                problem="MRI",
-                DC_type=DC_type,
-                backtracking=backtracking, 
-                lambda_dc=lambda_dc, lambda_Rtheta=lambda_Rtheta,
-                learn_lambda_dc=False, learn_lambda_Rtheta=True,
-                gamma=0.1, eta=0.5,
-                thresh=1e-4, max_iter=max_iter, 
-                device=device, path_folder=path_folder, 
-                sigma_noise=0.1,
-                sigma_denoiser=sigma_denoiser,
-                theta_interpol=0.2,
-                restart=True,
-                B_restart=5000,
-                learn_theta_interpol=False,
-                learn_B_restart=False)
+#     CNNBlock_model = GSDRUNet(in_channels=1, out_channels=1, pretrained='networks/GSDRUNet_grayscale_torch.ckpt')
 
-    # -------------------------------------------------------------------------------
-    # Entraînement
-    # -------------------------------------------------------------------------------
-    if init_train:
-        init_train_params = {"epoch_pretraining" : 20, "sigma_pretraining" : 0.2}
-    else:
-        init_train_params = None
+#     model = DeepEquilibrium(
+#                 Network=CNNBlock_model, 
+#                 problem="MRI",
+#                 DC_type=DC_type,
+#                 backtracking=backtracking, 
+#                 lambda_dc=lambda_dc, lambda_Rtheta=lambda_Rtheta,
+#                 learn_lambda_dc=False, learn_lambda_Rtheta=True,
+#                 gamma=0.1, eta=0.5,
+#                 thresh=1e-4, max_iter=max_iter, 
+#                 device=device, path_folder=path_folder, 
+#                 sigma_noise=noise_level,
+#                 sigma_denoiser=sigma_denoiser,
+#                 theta_interpol=0.2,
+#                 restart=True,
+#                 B_restart=5000,
+#                 learn_theta_interpol=False,
+#                 learn_B_restart=False)
+    
+#     # -------------------------------------------------------------------------------
+#     # Entraînement
+#     # -------------------------------------------------------------------------------
+#     if init_train:
+#         init_train_params = {"epoch_pretraining" : 20, "sigma_pretraining" : 0.2}
+#     else:
+#         init_train_params = None
+    
+#     pretrained_path = None
+#     train = False
+#     if train:
+#         model.train_model(
+#             train_loader=train_dataloader,
+#             val_loader=val_dataloader,
+#             accelerated=accelerated,
+#             JFB=True,
+#             K_JFB=0,
+#             lr=1e-5,
+#             eta_k=None,
+#             eta_TV=None,
+#             eta_l1=None,
+#             optimizer=torch.optim.Adam,
+#             optimizer_kwargs={"betas": (0.9, 0.999)},
+#             scheduler=None,
+#             scheduler_kwargs=None,
+#             max_patience=25,
+#             max_epochs=1000,
+#             plot_interval=1,
+#             pretrained_path=pretrained_path)
+        
+#     test = True
+#     if test:
+#         dict = model.evaluate(test_loader=val_dataloader, n_display=2, accelerated=accelerated, init_train=init_train_params, pretrained_path=pretrained_path, PnP=False)
 
-    pretrained_path = None
-    train = False
-    if train:
-        model.train_model(
-            train_loader=train_dataloader,
-            val_loader=val_dataloader,
-            accelerated=accelerated,
-            JFB=True,
-            K_JFB=3,
-            lr=1e-5,
-            eta_k=None,
-            eta_TV=None,
-            eta_l1=None,
-            optimizer=torch.optim.Adam,
-            optimizer_kwargs={"betas": (0.9, 0.999)},
-            scheduler=None,
-            scheduler_kwargs=None,
-            max_patience=25,
-            max_epochs=1,
-            plot_interval=1,
-            pretrained_path=pretrained_path)
+#         test_mse = dict["test_mse"]
+#         test_PSNR = dict["test_PSNR"]
+#         input_mse = dict["input_mse"]
+#         input_PSNR = dict["input_PSNR"]
 
-    test = True
-    if test:
-        dict = model.evaluate(test_loader=val_dataloader, n_display=2, accelerated=accelerated, init_train=init_train_params, pretrained_path=pretrained_path, PnP=False)
+#         # On sauvegarde les paramètres et les résultats dans un fichier texte
+#         with open(os.path.join(path_folder, "results.txt"), "w") as f:
+#                 f.write(f"DC_type: {DC_type}\n")
+#                 f.write(f"lambda_Rtheta: {lambda_Rtheta}\n")
+#                 f.write(f"sigma_denoiser: {sigma_denoiser}\n")
+#                 f.write(f"lambda_dc: {lambda_dc}\n")
+#                 f.write(f"test_mse: {test_mse}\n")
+#                 f.write(f"test_PSNR: {test_PSNR}\n")
+#                 f.write(f"input_mse: {input_mse}\n")
+#                 f.write(f"input_PSNR: {input_PSNR}\n")
 
-    test_mse = dict["test_mse"]
-    test_PSNR = dict["test_PSNR"]
-    input_mse = dict["input_mse"]
-    input_PSNR = dict["input_PSNR"]
+# for accelerated in accelerateds:
+    
+#     # recherche du meilleur modèle (en fonction du PSNR) parmi tous les modèles entraînés
+#     best_PSNR = -float('inf')
+#     best_model_path = None
 
-    # On sauvegarde les paramètres et les résultats dans un fichier texte
-    with open(os.path.join(path_folder, "results.txt"), "w") as f:
-        f.write(f"DC_type: {DC_type}\n")
-        f.write(f"lambda_Rtheta: {lambda_Rtheta}\n")
-        f.write(f"sigma_denoiser: {sigma_denoiser}\n")
-        f.write(f"test_mse: {test_mse}\n")
-        f.write(f"test_PSNR: {test_PSNR}\n")
-        f.write(f"input_mse: {input_mse}\n")
-        f.write(f"input_PSNR: {input_PSNR}\n")
+#     for lambda_Rtheta, sigma_denoiser in product(lambda_Rthetas, sigma_denoising):
+#         path_folder = "Unrolling_comparison/MRI/sigma1255/acceleration_{}/accelerated_{}/prox_lambda_Rtheta_{:.2f}_sigma_{:.2f}".format(
+#             acceleration, accelerated, lambda_Rtheta, sigma_denoiser)
+#     # for sigma_denoiser, init_train, lambda_dc in product(sigma_denoising, init_trains, lambdas_dc):
+#     #     path_folder = "Unrolling_comparison/MRI/PnP/acceleration_{}/prox_sigma_{:.2f}_init_train_{}_lambda_dc_{:.5f}".format(
+#     #         acceleration, sigma_denoiser, init_train, lambda_dc)
+#         with open(os.path.join(path_folder, "results.txt"), "r") as f:
+#             print(path_folder)
+#             lines = f.readlines()
+#             for line in lines:
+#                 print(path_folder)
+#                 if line.startswith("test_PSNR:"):
+#                     PSNR = float(line.split(":")[1].strip())
+#                     if PSNR > best_PSNR:
+#                         best_PSNR = PSNR
+#                         best_model_path = path_folder
 
-# recherche du meilleur modèle (en fonction du PSNR) parmi tous les modèles entraînés
-DC_type = 'grad'
-best_PSNR = -float('inf')
-best_model_path = None
-for lambda_Rtheta, sigma_denoiser, n_iter, lambda_dc, init_train in product(lambda_Rthetas, sigma_denoising, lambda_dcs, init_trains):
-    path_folder = 'Unrolling_comparison/rician/' + f'DC_{DC_type}_lambda_Rtheta_{lambda_Rtheta}_sigma_denoiser_{sigma_denoiser}_n_iter_init_{n_iter}_lambda_dc_{lambda_dc}_init_train_{init_train}'
-    with open(os.path.join(path_folder, "results.txt"), "r") as f:
-        lines = f.readlines()
-        for line in lines:
-            if line.startswith("test_PSNR:"):
-                PSNR = float(line.split(":")[1].strip())
-                if PSNR > best_PSNR:
-                    best_PSNR = PSNR
-                    best_model_path = path_folder
+#     # On écrit le meilleur modèle dans un fichier texte
+#     with open("Unrolling_comparison/MRI/sigma1255/acceleration_{}/accelerated_{}/best_model_prox.txt".format(acceleration, accelerated), "w") as f:
+#         f.write(f"Best model path: {best_model_path}\n")
+#         f.write(f"Best PSNR: {best_PSNR}\n")
 
-# On écrit le meilleur modèle dans un fichier texte
-with open("Unrolling_comparison/rician/best_model_grad.txt", "w") as f:
-    f.write(f"Best model path: {best_model_path}\n")
-    f.write(f"Best PSNR: {best_PSNR}\n")
+# lambda_Rtheta = 0.1
+# sigma_denoiser = 0.0
+# noise_level = 1./255
+# accelerated = True  # True pour entraînement accéléré, False pour entraînement complet
+# max_iter = 500
+# backtracking = False
+# init_train = False
+# lambda_dc = 1.0 # lambda_dc dépend de lambda_Rtheta pour éviter des valeurs trop grandes
+# CNNBlock_model = GSDRUNet(in_channels=1, out_channels=1, pretrained='networks/GSDRUNet_grayscale_torch.ckpt')
+# DC_type = 'grad'
 
-# ------------------------------------------------------------------------------
-# Paramètres (facilement modifiables)
-# ------------------------------------------------------------------------------
-DC_type = 'prox'
-lambda_Rthetas = np.linspace(-1., 0., num=10).tolist()
-Network = 'DRUNet'
+# # -------------------------------------------------------------------------------
+# # Dossier pour sauvegarde et paramètres du modèle
+# # -------------------------------------------------------------------------------
+    
+# path_folder = "Unrolling_comparison/MRI/DEQ/grad_acceleration_{}_Rtheta_{:.2f}_lambda_dc_{:.2f}_noise_{:.3f}_sigma_denoiser_{:.2f}".format(acceleration, lambda_Rtheta, lambda_dc, noise_level, sigma_denoiser)
+# # os.makedirs(path_folder, exist_ok=True)
+# os.makedirs(path_folder, exist_ok=True)
+
+# model = DeepEquilibrium(
+#                 Network=CNNBlock_model, 
+#                 problem="MRI",
+#                 DC_type=DC_type,
+#                 backtracking=backtracking, 
+#                 lambda_dc=lambda_dc, lambda_Rtheta=lambda_Rtheta,
+#                 learn_lambda_dc=True, learn_lambda_Rtheta=True,
+#                 gamma=0.01, eta=0.5,
+#                 thresh=1e-4, max_iter=max_iter, 
+#                 device=device, path_folder=path_folder, 
+#                 sigma_noise=noise_level,
+#                 sigma_denoiser=sigma_denoiser,
+#                 theta_interpol=0.2,
+#                 restart=True,
+#                 B_restart=100,
+#                 learn_theta_interpol=False,
+#                 learn_B_restart=False)
+
+# # -------------------------------------------------------------------------------
+# # Entraînement
+# # -------------------------------------------------------------------------------
+
+# pretrained = path_folder + "/best_model.pth"  # mettre à None si pas de modèle pré-entraîné
+# train = False
+# if train:
+#     model.train_model(
+#             train_loader=train_dataloader,
+#             val_loader=val_dataloader,
+#             accelerated=accelerated,
+#             init_train=None,
+#             JFB=True,
+#             K_JFB=0.,
+#             lr=1e-5,
+#             eta_k=None,
+#             eta_TV=None,
+#             eta_l1=None,
+#             optimizer=torch.optim.Adam,
+#             optimizer_kwargs={"betas": (0.9, 0.999)},
+#             scheduler=None,
+#             scheduler_kwargs=None,
+#             max_patience=25,
+#             max_epochs=500,
+#             plot_interval=1,
+#             pretrained_path=pretrained)
+
+# pretrained = path_folder + "/best_model.pth"  # chemin vers le modèle pré-entraîné, si disponible
+# test = True
+# if test:
+#     dict = model.evaluate(test_loader=test_dataloader, n_display=7, accelerated=accelerated, init_train=None, pretrained_path=pretrained, PnP=False)
+
+# test_mse = dict["test_mse"]
+# test_PSNR = dict["test_PSNR"]
+# input_mse = dict["input_mse"]
+# input_PSNR = dict["input_PSNR"]
+# input_SSIM = dict["input_SSIM"]
+# test_SSIM = dict["test_SSIM"]
+
+# with open(os.path.join(path_folder, "results.txt"), "w") as f:
+#     f.write(f"DC_type: {DC_type}\n")
+#     f.write(f"lambda_Rtheta: {lambda_Rtheta}\n")
+#     f.write(f"sigma_denoiser: {sigma_denoiser}\n")
+#     f.write(f"lambda_dc: {lambda_dc}\n")
+#     f.write(f"test_mse: {test_mse}\n")
+#     f.write(f"test_PSNR: {test_PSNR}\n")
+#     f.write(f"input_mse: {input_mse}\n")
+#     f.write(f"input_PSNR: {input_PSNR}\n")
+#     f.write(f"input_SSIM: {input_SSIM}\n")
+#     f.write(f"test_SSIM: {test_SSIM}\n")
+
+lambda_Rtheta = 0.65
+sigma_denoiser = 0.03
+noise_level = 1./255
 accelerated = True  # True pour entraînement accéléré, False pour entraînement complet
 max_iter = 200
 backtracking = False
-sigma_denoising = np.linspace(0.01, 0.1, num=10).tolist()
-lambda_dc = [1.0]
-init_trains = [True, False]
+init_train = False
+lambda_dc = 0.5 # lambda_dc dépend de lambda_Rtheta pour éviter des valeurs trop grandes
+CNNBlock_model = GSDRUNet(in_channels=1, out_channels=1, pretrained='networks/GSDRUNet_grayscale_torch.ckpt')
+DC_type = 'grad'
 
-for lambda_Rtheta, sigma_denoiser, lambda_dc, init_train in product(lambda_Rthetas, sigma_denoising, lambda_dc, init_trains):
-    # -------------------------------------------------------------------------------
-    # Dossier pour sauvegarde et paramètres du modèle
-    # -------------------------------------------------------------------------------
-    
-    path_folder = "Unrolling_comparison/MRI/acceleration_{}/lambda_Rtheta_{:.2f}_sigma_{:.3f}_lambda_dc_{:.2f}".format(
-        acceleration, lambda_Rtheta, sigma_denoiser, lambda_dc)
-    os.makedirs(path_folder, exist_ok=True)
-    
-    if Network == 'DRUNet':
-        CNNBlock_model = GSDRUNet(in_channels=1, out_channels=1, pretrained='networks/GSDRUNet_grayscale_torch.ckpt')
+# -------------------------------------------------------------------------------
+# Dossier pour sauvegarde et paramètres du modèle
+# -------------------------------------------------------------------------------
 
-    model = DeepEquilibrium(
+path_folder = "Unrolling_comparison/MRI/DEQ/grad_acceleration_{}_Rtheta_{:.2f}_lambda_dc_{:.2f}_noise_{:.3f}_sigma_denoiser_{:.2f}_learn_lambda_dc".format(acceleration, lambda_Rtheta, lambda_dc, noise_level, sigma_denoiser)
+os.makedirs(path_folder, exist_ok=True)
+
+model = DeepEquilibrium(
                 Network=CNNBlock_model, 
                 problem="MRI",
                 DC_type=DC_type,
                 backtracking=backtracking, 
                 lambda_dc=lambda_dc, lambda_Rtheta=lambda_Rtheta,
-                learn_lambda_dc=False, learn_lambda_Rtheta=True,
-                gamma=0.1, eta=0.5,
+                learn_lambda_dc=True, learn_lambda_Rtheta=True,
+                gamma=0.01, eta=0.5,
                 thresh=1e-4, max_iter=max_iter, 
                 device=device, path_folder=path_folder, 
-                sigma_noise=0.1,
+                sigma_noise=noise_level,
                 sigma_denoiser=sigma_denoiser,
                 theta_interpol=0.2,
                 restart=True,
-                B_restart=5000,
+                B_restart=100,
                 learn_theta_interpol=False,
                 learn_B_restart=False)
-    
-    # -------------------------------------------------------------------------------
-    # Entraînement
-    # -------------------------------------------------------------------------------
-    if init_train:
-        init_train_params = {"epoch_pretraining" : 20, "sigma_pretraining" : 0.2}
-    else:
-        init_train_params = None
-    
-    pretrained_path = None
-    train = False
-    if train:
-        model.train_model(
+
+# -------------------------------------------------------------------------------
+# Entraînement
+# -------------------------------------------------------------------------------
+train = True
+if train:
+    model.train_model(
             train_loader=train_dataloader,
             val_loader=val_dataloader,
             accelerated=accelerated,
+            init_train=None,
             JFB=True,
-            K_JFB=3,
+            K_JFB=0.,
             lr=1e-5,
             eta_k=None,
             eta_TV=None,
@@ -258,41 +467,30 @@ for lambda_Rtheta, sigma_denoiser, lambda_dc, init_train in product(lambda_Rthet
             scheduler=None,
             scheduler_kwargs=None,
             max_patience=25,
-            max_epochs=1,
+            max_epochs=1000,
             plot_interval=1,
-            pretrained_path=pretrained_path)
-        
-    test = True
-    if test:
-        dict = model.evaluate(test_loader=val_dataloader, n_display=2, accelerated=accelerated, init_train=init_train_params, pretrained_path=pretrained_path, PnP=False)
+            pretrained_path=None)
 
-    test_mse = dict["test_mse"]
-    test_PSNR = dict["test_PSNR"]
-    input_mse = dict["input_mse"]
-    input_PSNR = dict["input_PSNR"]
+pretrained = path_folder + "/best_model.pth"  # chemin vers le modèle pré-entraîné, si disponible
+test = True
+if test:
+    dict = model.evaluate(test_loader=test_dataloader, n_display=7, accelerated=accelerated, init_train=None, pretrained_path=pretrained, PnP=False)
 
-    # On sauvegarde les paramètres et les résultats dans un fichier texte
-    with open(os.path.join(path_folder, "results.txt"), "w") as f:
-            f.write(f"DC_type: {DC_type}\n")
-            f.write(f"lambda_Rtheta: {lambda_Rtheta}\n")
-            f.write(f"sigma_denoiser: {sigma_denoiser}\n")
-            f.write(f"lambda_dc: {lambda_dc}\n")
-            f.write(f"test_mse: {test_mse}\n")
-            f.write(f"test_PSNR: {test_PSNR}\n")
-            f.write(f"input_mse: {input_mse}\n")
-            f.write(f"input_PSNR: {input_PSNR}\n")
-    
-# recherche du meilleur modèle (en fonction du PSNR) parmi tous les modèles entraînés
-DC_type = 'prox'
-best_PSNR = -float('inf')
-best_model_path = None
-for lambda_Rtheta, sigma_denoiser, lambda_dc, init_train in product(lambda_Rthetas, sigma_denoising, lambda_dc, init_trains):
-    path_folder = 'Unrolling_comparison/MRI/' + f'DC_{DC_type}_lambda_Rtheta_{lambda_Rtheta}_sigma_denoiser_{sigma_denoiser}_lambda_dc_{lambda_dc}_init_train_{init_train}'
-    with open(os.path.join(path_folder, "results.txt"), "r") as f:
-        lines = f.readlines()
-        for line in lines:
-            if line.startswith("test_PSNR:"):
-                PSNR = float(line.split(":")[1].strip())
-                if PSNR > best_PSNR:
-                    best_PSNR = PSNR
-                    best_model_path = path_folder
+test_mse = dict["test_mse"]
+test_PSNR = dict["test_PSNR"]
+input_mse = dict["input_mse"]
+input_PSNR = dict["input_PSNR"]
+input_SSIM = dict["input_SSIM"]
+test_SSIM = dict["test_SSIM"]
+
+with open(os.path.join(path_folder, "results.txt"), "w") as f:
+    f.write(f"DC_type: {DC_type}\n")
+    f.write(f"lambda_Rtheta: {lambda_Rtheta}\n")
+    f.write(f"sigma_denoiser: {sigma_denoiser}\n")
+    f.write(f"lambda_dc: {lambda_dc}\n")
+    f.write(f"test_mse: {test_mse}\n")
+    f.write(f"test_PSNR: {test_PSNR}\n")
+    f.write(f"input_mse: {input_mse}\n")
+    f.write(f"input_PSNR: {input_PSNR}\n")
+    f.write(f"input_SSIM: {input_SSIM}\n")
+    f.write(f"test_SSIM: {test_SSIM}\n")

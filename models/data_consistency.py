@@ -31,7 +31,7 @@ def Forward_MRI(image, mask):
 
 def Adjoint_MRI(k0, mask):
     mask_2ch = torch.cat([mask, mask], dim=1)
-    Ah_k0 = ifft2c(k0 * mask_2ch)
+    Ah_k0 = ifft2c(mask_2ch * k0)
     return Ah_k0
 
 # Data consistency for random inpainting

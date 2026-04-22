@@ -1,0 +1,8 @@
+DC_type: prox
+lambda_Rtheta: 0.1
+sigma_denoiser: 0.02
+lambda_dc: 1.0
+test_mse: 0.002155057466357129
+test_PSNR: 27.22841979640874
+input_mse: 0.004526437280366846
+input_PSNR: 23.90672224464664

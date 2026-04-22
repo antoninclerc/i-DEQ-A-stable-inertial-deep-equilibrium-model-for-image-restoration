@@ -1,38 +1,5 @@
 import torch
-import torch.nn as nn
-
-from networks.ResUnet import UNetRes as Net
 import deepinv as dinv
-
-import torch
-from torch.hub import load_state_dict_from_url
-
-from deepinv.models.drunet import DRUNet
-from deepinv.models.GSPnP import GSPnP
-
-class Drunet(torch.nn.Module):# DRUNet model definition 
-    def __init__(self, n_channels, nc=[64, 128, 256, 512], nb=4, act_mode='R', downsample_mode="strideconv", upsample_mode="convtranspose", bias=False, pretrained=None):
-        super(Drunet, self).__init__()
-        self.model = Net(in_channels=n_channels+1, out_channels=n_channels, nc=nc, nb=nb, act_mode=act_mode, downsample_mode=downsample_mode, upsample_mode=upsample_mode, bias=bias)
-        self.detach = False
-        self.model.load_state_dict(torch.load(pretrained), strict=True)
-        for k, v in self.model.named_parameters():
-            v.requires_grad = False
-
-    def forward(self, x, sigma):
-        '''
-        x : image with values in [0, 1]
-        sigma : standard deviation of denoising in [0, 1]
-        '''
-        sigma = float(sigma)
-        sigma_div_255 = torch.FloatTensor([sigma]).repeat(x.shape[0], 1, x.shape[2], x.shape[3]).to(self.device)
-        x = torch.cat((x, sigma_div_255), dim=1)
-        return self.model(x)
-    
-    def potential(self, x, sigma):
-        N = self.student_grad(x, sigma)
-        return 0.5 * torch.norm((x - N).reshape(x.shape[0], -1), p=2, dim=-1) ** 2
-
 
 def GSDRUNet(
     alpha=1.0,

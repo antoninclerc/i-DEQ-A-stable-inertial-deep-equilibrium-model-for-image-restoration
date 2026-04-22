@@ -1,0 +1,10 @@
+DC_type: grad
+lambda_Rtheta: 0.65
+sigma_denoiser: 0.03
+lambda_dc: 0.5
+test_mse: 0.0019288129045226246
+test_PSNR: 27.74998483349584
+input_mse: 0.004526437280366846
+input_PSNR: 23.90672224464664
+input_SSIM: 0.48853167634373557
+test_SSIM: 0.5623469809674765

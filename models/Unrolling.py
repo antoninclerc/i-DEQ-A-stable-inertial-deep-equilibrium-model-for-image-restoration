@@ -5,6 +5,7 @@ import torch.nn as nn
 import os
 import numpy as np
 import matplotlib.pyplot as plt
+import time
 
 from models.data_consistency import (
     DC_prox_MRI, DC_grad_MRI, Adjoint_MRI, Forward_MRI, 
@@ -103,41 +104,26 @@ class Unrolling(nn.Module):
             self.Adjoint = Adjoint_MRI
             self.forward_op = Forward_MRI
             self.adjoint_op = Adjoint_MRI
-
-        elif self.problem == "Inpainting":
-            if self.DC_type == "prox":
-                self.DC = DC_prox_inpainting
-            elif self.DC_type == "grad":
-                self.DC = DC_grad_inpainting
-            self.Adjoint = Adjoint_inpainting
-            self.forward_op = Forward_inpainting
-            self.adjoint_op = Adjoint_inpainting
-        else:            
+        else:    
             raise ValueError("Unsupported problem type")
         
     def denoiser(self, x):
-        if self.problem == "MRI":
-            x_in = x[:, 0, :, :].unsqueeze(1)  # Extract real part
-        else:
-            x_in = x
+        x_in = x[:, 0, :, :].unsqueeze(1)  # Extract real part
        
         if self.use_noise:
             x_out = self.Network(x_in, self.sigma_denoiser)
         else:
             x_out = self.Network(x_in)
         
-        if self.problem == "MRI":
-            x_out = add_zero_channel(x_out)  # Add zero imaginary part
+        x_out = add_zero_channel(x_out)  # Add zero imaginary part
         
         return x_out
     
     def forward_MoDL(self, y, mask):
 
-        if self.problem == "MRI":
-            image = self.Adjoint(y, mask) 
-        elif self.problem == "Inpainting":
-            image = self.Adjoint(y, mask) + 0.5 * (1 - mask) * y  # Start with zero-filled image for inpainting
-        
+        image = self.Adjoint(y, mask) 
+        image = torch.clamp(image, 0, 1.0)
+
         niter = 0
         intermediate_outputs = []
 
@@ -148,6 +134,8 @@ class Unrolling(nn.Module):
             # Denoising step
             image = self.denoiser(image)
 
+            image = torch.clamp(image, 0, 1.0)
+
             niter += 1
 
             intermediate_outputs.append(image.detach())
@@ -156,10 +144,8 @@ class Unrolling(nn.Module):
     
     def forward_Varnet(self, y, mask):
 
-        if self.problem == "MRI":
-            image = self.Adjoint(y, mask) 
-        elif self.problem == "Inpainting":
-            image = self.Adjoint(y, mask) + 0.5 * (1 - mask) * y  # Start with zero-filled image for inpainting
+        image = self.Adjoint(y, mask) 
+        image = torch.clamp(image, 0, 1.0)
         
         niter = 0
         intermediate_outputs = []
@@ -172,6 +158,8 @@ class Unrolling(nn.Module):
 
             image = image_grad - image_denoised
 
+            image = torch.clamp(image, 0, 1.0)
+            
             niter += 1
             intermediate_outputs.append(image.detach())
         
@@ -236,16 +224,19 @@ class Unrolling(nn.Module):
         train_PSNRs, val_PSNRs = [], []
         train_ssim, val_ssim = [], []
 
+        time_per_epoch = []
+
         iter_nums = []
         iter_nums_val = []
 
         total_params = sum(p.numel() for p in self.parameters() if p.requires_grad)
         print(f"Total trainable parameters: {total_params}")
-
+        time_start = time.time()
         # =================================================
         # Training loop
         # =================================================
         for epoch in range(1, max_epochs+1):
+            time_epoch_start = time.time()
 
             if patience >= max_patience:
                 break
@@ -265,24 +256,13 @@ class Unrolling(nn.Module):
                 
                 batch_input = batch_input.to(self.device).float()
 
-                B = batch_input.shape[0]
-
-                if self.sigma_noise == "random":
-                    noise = torch.rand(B, 1, 1, 1, device=self.device) * 0.1
-                else:
-                    noise = torch.full((B, 1, 1, 1), self.sigma_noise, device=self.device)
-
-                batch_input = batch_input + noise * torch.randn_like(batch_input)
-                batch_input = torch.clamp(batch_input, 0, 1.0)
+                batch_input = batch_input + self.sigma_noise * torch.randn_like(batch_input)
 
                 batch_mask = batch_mask["mask"].to(self.device).float()
-                if self.problem == "MRI":
-                    batch_input = batch_input * batch_mask  # Ensure masked input is consistent in k-space for MRI
+                batch_input = batch_input * batch_mask
 
                 batch_target = batch_target.to(self.device).float()
 
-                epoch_iter_nums = []
-                epoch_iter_nums_val = []
                 if mode == "MoDL":
                     outputs, _ = self.forward_MoDL(batch_input, batch_mask)
                 else:
@@ -296,7 +276,6 @@ class Unrolling(nn.Module):
                 loss.backward()
                 
                 optimizer.step()
-                optimizer.zero_grad()
 
                 mse_list, psnr_list, ssim_list, _ = compute_batch_metrics(
                     outputs, batch_target
@@ -305,6 +284,7 @@ class Unrolling(nn.Module):
                 epoch_train_mse.extend(mse_list)
                 epoch_train_psnr.extend(psnr_list)
                 epoch_train_ssim.extend(ssim_list)
+            
 
             epoch_train_mse = np.mean(epoch_train_mse)
             epoch_train_psnr = np.mean(epoch_train_psnr)
@@ -326,21 +306,12 @@ class Unrolling(nn.Module):
                 for batch_target, batch_input, batch_mask in val_loader:
 
                     batch_input = batch_input.to(self.device).float()
-                    
-                    B = batch_input.shape[0]
 
-                    if self.sigma_noise == "random":
-                        noise = torch.linspace(0, 0.1, B, device=self.device).view(B,1,1,1)
-                    else:
-                        noise = torch.full((B,1,1,1), self.sigma_noise, device=self.device)
-
-                    batch_input = batch_input + noise * torch.randn_like(batch_input)
-
-                    batch_input = torch.clamp(batch_input, 0, 1.0)  # Ensure input is in valid range
+                    batch_input = batch_input + self.sigma_noise * torch.randn_like(batch_input)
 
                     batch_mask = batch_mask["mask"].to(self.device).float()
-                    if self.problem == "MRI":
-                        batch_input = batch_input * batch_mask  # Ensure masked input is consistent in k-space
+
+                    batch_input = batch_input * batch_mask  # Ensure masked input is consistent in k-space
 
                     batch_target = batch_target.to(self.device).float()
 
@@ -374,6 +345,21 @@ class Unrolling(nn.Module):
                     f"Val SSIM: {epoch_val_ssim:.4f} | "
                     f"Patience: {patience}"
                 )
+                time_epoch_end = time.time()
+                time_per_epoch.append(time_epoch_end - time_epoch_start)
+
+                # On ecrit les stats dans un fichier texte
+                with open(os.path.join(self.path, "training_log.txt"), "a") as f:
+                    f.write(
+                        f"Epoch {epoch}/{max_epochs} | "
+                        f"Train MSE: {epoch_train_mse:.6f} | "
+                        f"Train PSNR: {epoch_train_psnr:.2f} dB | "
+                        f"Val MSE: {epoch_val_mse:.6f} | "
+                        f"Val PSNR: {epoch_val_psnr:.2f} dB | "
+                        f"Val SSIM: {epoch_val_ssim:.4f} | "
+                        f"Patience: {patience} | "
+                        f"Epoch time: {time_epoch_end - time_epoch_start:.2f} seconds\n"
+                    )
 
                 # ---------------------
                 # Plot
@@ -410,6 +396,17 @@ class Unrolling(nn.Module):
 
         print("Training complete.")
 
+        end_time = time.time()
+        print(f"Total training time: {end_time - time_start:.2f} seconds")
+
+        mean_time_per_epoch = np.mean(time_per_epoch) if time_per_epoch else 0
+        print(f"Average time per epoch: {mean_time_per_epoch:.2f} seconds")
+
+        # On ecrit les temps dans un fichier texte
+        with open(os.path.join(self.path, "training_log.txt"), "a") as f:
+            f.write(f"Total training time: {end_time - time_start:.2f} seconds\n")
+            f.write(f"Average time per epoch: {mean_time_per_epoch:.2f} seconds\n")
+        
         return {
             "train_losses": train_losses,
             "val_losses": val_losses,
@@ -439,30 +436,20 @@ class Unrolling(nn.Module):
         display_ssim, display_input_ssim = [], []
         n_collected = 0
 
-        # convergence plots
         psnr_per_iter_accumulator = None
-        eps_per_iter_accumulator = None
+
+        # convergence plots
         n_batches = 0
 
         with torch.no_grad():
             for batch_target, batch_input, batch_mask in test_loader:
 
                 batch_input = batch_input.to(self.device).float()
-                    
-                B = batch_input.shape[0]
 
-                if self.sigma_noise == "random":
-                    noise = torch.linspace(0, 0.1, B, device=self.device).view(B,1,1,1)
-                else:
-                    noise = torch.full((B,1,1,1), self.sigma_noise, device=self.device)
-
-                batch_input = batch_input + noise * torch.randn_like(batch_input)
-
-                batch_input = torch.clamp(batch_input, 0, 1.0)  # Ensure input is in valid range
+                batch_input = batch_input + self.sigma_noise * torch.randn_like(batch_input)
                     
                 batch_mask = batch_mask["mask"].to(self.device).float()
-                if self.problem == "MRI":
-                    batch_input = batch_input * batch_mask  # Ensure masked input is consistent in k-space
+                batch_input = batch_input * batch_mask  # Ensure masked input is consistent in k-space
 
                 batch_target = batch_target.to(self.device).float()              
 
@@ -474,10 +461,7 @@ class Unrolling(nn.Module):
                 # -----------------------------
                 # Metrics
                 # -----------------------------
-                if self.problem == "MRI":
-                    batch_input_in = ifft2c(batch_input)
-                else:
-                    batch_input_in = batch_input
+                batch_input_in = ifft2c(batch_input)
                 mse_list, psnr_list, ssim_list, _ = compute_batch_metrics(outputs, batch_target)
                 mse_input, psnr_input, ssim_input, _ = compute_batch_metrics(batch_input_in, batch_target)
 
@@ -551,10 +535,9 @@ class Unrolling(nn.Module):
                 display_targets = torch.cat(display_targets, dim=0)
                 display_inputs = torch.cat(display_inputs, dim=0)
 
-                if self.problem == "MRI":
-                    display_outputs = image_2ch_to_magnitude(display_outputs)
-                    display_targets = image_2ch_to_magnitude(display_targets)
-                    display_inputs = image_2ch_to_magnitude(ifft2c(display_inputs))
+                display_outputs = image_2ch_to_magnitude(display_outputs)
+                display_targets = image_2ch_to_magnitude(display_targets)
+                display_inputs = image_2ch_to_magnitude(ifft2c(display_inputs))
 
                 display_inputs = torch.clamp(display_inputs, 0, 1.0)
                 display_targets = torch.clamp(display_targets, 0, 1.0)
@@ -605,7 +588,7 @@ class Unrolling(nn.Module):
                     )
 
                     plt.tight_layout()
-                    plt.savefig(os.path.join(self.path, f"test_reconstruction_{i}.png"))
+                    plt.savefig(os.path.join(self.path, f"test_reconstruction_{i}.pdf"), dpi=300)
                     plt.close()
 
         return {
@@ -613,4 +596,6 @@ class Unrolling(nn.Module):
             "test_PSNR": test_PSNR,
             "input_mse": input_mse,
             "input_PSNR": input_PSNR,
+            "test_SSIM": test_SSIM,
+            "input_SSIM": input_SSIM,
         }

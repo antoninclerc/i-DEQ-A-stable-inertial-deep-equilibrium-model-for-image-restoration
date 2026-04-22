@@ -75,7 +75,7 @@ def load_pretrained(model, checkpoint_path, device=None, optimizer=None, load_op
                 model_state[k] = param  # leave as is if not float
 
     # Load with strict=False
-    model.load_state_dict(state_dict, strict=False)
+    model.load_state_dict(state_dict, strict=True)
 
     print(f"Loaded model weights from {checkpoint_path}")
 
@@ -137,7 +137,7 @@ def data_consistency_func_gaussian(z, y, mask, forward_op):
     return value
 
 def grad_data_consistency_gaussian(z, y, mask, forward_op, adjoint_op):
-    k_diff = mask *(forward_op(z, mask) - y)
+    k_diff = forward_op(z, mask) - y
     grad = adjoint_op(k_diff, mask)
     return grad
 
@@ -227,26 +227,25 @@ def one_step(image, obs, mask,
              DC_type, noise_type, sigma, forward_op, adjoint_op):
     
     # RED gradient step
-    image_prev = image.clone()
     gradR = lambda_Rtheta * nabla_R(image)
 
     if DC_type == 'prox':
         image = image - lambda_dc * gradR
         if noise_type == 'gaussian':
-            image = DC(image, obs, mask, lambda_dc)
+            image_new = DC(image, obs, mask, lambda_dc)
         else:
-            image = DC(image, obs, sigma, lambda_dc)
+            image_new = DC(image, obs, sigma, lambda_dc)
 
     elif DC_type == 'grad':
         if noise_type == 'gaussian':
             gradf = grad_data_consistency_gaussian(image, obs, mask, forward_op, adjoint_op)
-            image = image - lambda_dc * (gradf + gradR)
+            image_new = image - lambda_dc * (gradf + gradR)
 
         else:
             gradf = grad_data_consistency_rician(image, obs, sigma)
-            image = image - lambda_dc * (gradf + gradR)
+            image_new = image - lambda_dc * (gradf + gradR)
                 
-    return image, image_prev
+    return image_new, image
 
 # ============================================================
 # LINE SEARCH / BACKTRACKING
@@ -302,7 +301,6 @@ def backtracking(x, y, f, gradf, R, gradR, tau0, lambda_Rtheta, gamma, eta):
                 break
 
     # étape finale différentiable
-    grad_phi_x = gradf(x, y) + lambda_Rtheta * gradR(x)
     Tx = x - tau.view(-1,1,1,1) * grad_phi_x
 
     return Tx, tau
@@ -326,7 +324,8 @@ def prox_backtracking(
 
     xk = x.clone()
     Fxk = F(x, y)
-    
+    nabla_Rxk = lambda_Rtheta * nabla_R(xk)
+
     with torch.no_grad():
 
         active = torch.ones(B, dtype=torch.bool, device=x.device)
@@ -334,30 +333,13 @@ def prox_backtracking(
         while active.any():
 
             active_idx = torch.nonzero(active, as_tuple=True)[0]
-
-            nabla_Rxk = nabla_R(xk)
-            zk = xk - lambda_Rtheta * tau.view(-1,1,1,1) * nabla_Rxk
-            #print('zk min, max:', zk.min().item(), zk.max().item())
-            #print('xk min, max:', xk.min().item(), xk.max().item())
-            #print('norm xk et zk:', torch.norm(xk), torch.norm(zk))
-            #print('lambda_Rtheta:', lambda_Rtheta)
-            #print('tau min, max:', tau.view(-1,1,1,1).min().item(), tau.view(-1,1,1,1).max().item())
-            # print('Fxk:', Fxk)
-            # print('Fzk:', F(zk, y))
+            zk = xk - tau.view(-1,1,1,1) * nabla_Rxk
 
             x_next = prox_f(zk, y, tau)
             Fx_next = F(x_next, y)
 
-            #print('x_next min, max:', x_next.min().item(), x_next.max().item())
-            #print('norm x_next:', torch.norm(x_next))
-            # print('Fx_next:', Fx_next)
-            #raise Exception("Debug stop")
-
             lhs = Fxk - Fx_next
             rhs = gamma / tau * torch.sum((xk - x_next)**2, dim=(1,2,3))
-
-            # print('lhs:', lhs)
-            # print('rhs:', rhs)
 
             condition = lhs >= rhs
 
@@ -374,11 +356,10 @@ def prox_backtracking(
                     active[idx] = False  # If no improvement, stop backtracking
 
     # étape finale différentiable
-    nabla_Rxk = nabla_R(xk)
-    zk = xk - lambda_Rtheta * tau.view(-1,1,1,1) * nabla_Rxk
-    x_hat = prox_f(zk, y, 1/tau)
+    zk = xk - tau.view(-1,1,1,1) * nabla_Rxk
+    x_next = prox_f(zk, y, tau)
 
-    return x_hat, tau
+    return x_next, tau
 
 def restart_condition(intermediates, B_restart):
 
@@ -696,24 +677,41 @@ def plot_training_state(
     plt.subplot(2, 2, 3)
     if outputs.shape[1] == 2:  # complex
         image = image_2ch_to_magnitude(outputs)[-1]
+        type = "greyscale"
+    elif outputs.shape[1] == 3:  # RGB
+        image = outputs[-1].permute(1, 2, 0)  # C H W -> H W C
+        type = "color"
     else:
         image = outputs[-1, 0, :, :]
+        type = "greyscale"
     plt.title("Reconstructed Image")
-    plt.imshow(image.detach().cpu(), cmap="gray", vmin=0, vmax=1)
+    if type == "color":
+        plt.imshow(image.detach().cpu())
+    else:
+        plt.imshow(image.detach().cpu(), cmap="gray", vmin=0, vmax=1)
     plt.axis("off")
 
     # --- Ground truth ---
     plt.subplot(2, 2, 4)
     if target.shape[1] == 2:  # complex
         image = image_2ch_to_magnitude(target)[-1]
+        type = "greyscale"
+    elif target.shape[1] == 3:  # RGB
+        image = target[-1].permute(1, 2, 0)  # C H W -> H W C
+        type = "color"
     else:
+        type = "greyscale"
+
         image = target[-1, 0, :, :]
     plt.title("Ground Truth Image")
-    plt.imshow(image.detach().cpu(), cmap="gray", vmin=0, vmax=1)
+    if type == "color":
+        plt.imshow(image.detach().cpu())
+    else:
+        plt.imshow(image.detach().cpu(), cmap="gray", vmin=0, vmax=1)
     plt.axis("off")
 
     plt.tight_layout()
-    plt.savefig(os.path.join(save_path, f"Val_{epoch}.png"))
+    plt.savefig(os.path.join(save_path, f"Val_{epoch}.pdf"))
     plt.close()
 
 def validation_and_checkpoint(
@@ -792,7 +790,7 @@ def jacobian_free_backpropagation(
 ):
     # 1) Differentiable leaf
     z = z_fixed.detach().requires_grad_(True)
-
+    z = torch.clamp(z, 0.0, 1.0)  # Ensure z is in [0,1] to avoid numerical issues
     # 2) Compute loss
     loss = loss_fn(z, target)
 
@@ -800,32 +798,39 @@ def jacobian_free_backpropagation(
     g = torch.autograd.grad(loss, z, allow_unused=False)[0]
 
     # 4) Single-step evaluation f_theta(z)
-    tau0 = torch.tensor(lambda_dc, device=z.device)
+    tau0 = lambda_dc if isinstance(lambda_dc, float) else lambda_dc
     if backtracking:
         if DC_type == "prox":
             fz, _ = one_step_PGD_back(
-                image=z, obs=y, mask=mask, DC=DC, R=Rtheta, nabla_R=nabla_x_network,
-                lambda_dc=tau0, lambda_Rtheta=lambda_Rtheta, gamma=gamma, eta=eta,
-                forward_op=forward_op, noise_type=noise_type, sigma=sigma)
+                            image=z, obs=y, mask=mask, DC=DC, R=Rtheta,
+                            nabla_R=nabla_x_network,
+                            lambda_dc=tau0, lambda_Rtheta=lambda_Rtheta,
+                            gamma=gamma, eta=eta,
+                            forward_op=forward_op, noise_type=noise_type, sigma=sigma
+                        )
             
         elif DC_type == "grad":
             fz, _ = one_step_GD_back(
-                image=z, obs=y, mask=mask, R=Rtheta, nabla_R=nabla_x_network,
-                lambda_dc=tau0, lambda_Rtheta=lambda_Rtheta, gamma=gamma, eta=eta,
-                forward_op=forward_op, adjoint_op=adjoint_op, noise_type=noise_type, sigma=sigma)
-                
+                image=z, obs=y, mask=mask, R=Rtheta,
+                nabla_R=nabla_x_network,
+                lambda_dc=tau0, lambda_Rtheta=lambda_Rtheta,
+                gamma=gamma, eta=eta,
+                forward_op=forward_op, adjoint_op=adjoint_op,
+                noise_type=noise_type, sigma=sigma)
         else:
             raise ValueError("Unsupported DC for backtracking")
     else:
         fz, _ = one_step(
-            z, y, mask, DC, nabla_x_network,
-            lambda_dc, lambda_Rtheta, DC_type,
-            noise_type, sigma, forward_op, adjoint_op
-        )
+                image=z, obs=y, mask=mask, DC=DC, nabla_R=nabla_x_network, 
+                lambda_dc=tau0, lambda_Rtheta=lambda_Rtheta, 
+                DC_type=DC_type, noise_type=noise_type, sigma=sigma,
+                forward_op=forward_op, adjoint_op=adjoint_op)
 
     # 5) Neumann approximation of (I - J_f^T)^{-1} g
     v = g
     acc = g
+    
+    # fz = torch.clamp(fz, 0.0, 1.0)  # Ensure fz is in [0,1] to avoid numerical issues
 
     if K_JFB > 0:
         for _ in range(K_JFB):
@@ -850,6 +855,7 @@ def jacobian_free_backpropagation(
     # 7) Assign gradients
     for p, gparam in zip(params, grads):
         if gparam is None:
+            print('No grad !')
             p.grad = torch.zeros_like(p, device=p.device)
         else:
             p.grad = gparam

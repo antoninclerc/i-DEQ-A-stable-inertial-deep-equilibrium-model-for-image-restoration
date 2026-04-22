@@ -1,0 +1,29 @@
+Epoch 1: Train MSE=0.001778, Val MSE=0.001662, Train PSNR=28.35 dB, Val PSNR=28.64 dB, Train SSIM=0.6462, Val SSIM=0.6491, Iter Train=215.0, Iter Val=233.0, Time Epoch=429.96 sec
+Epoch 2: Train MSE=0.001728, Val MSE=0.001653, Train PSNR=28.50 dB, Val PSNR=28.67 dB, Train SSIM=0.6477, Val SSIM=0.6493, Iter Train=219.0, Iter Val=233.0, Time Epoch=429.26 sec
+Epoch 3: Train MSE=0.001736, Val MSE=0.001668, Train PSNR=28.48 dB, Val PSNR=28.63 dB, Train SSIM=0.6478, Val SSIM=0.6492, Iter Train=220.0, Iter Val=233.0, Time Epoch=428.37 sec
+Epoch 4: Train MSE=0.001751, Val MSE=0.001667, Train PSNR=28.44 dB, Val PSNR=28.63 dB, Train SSIM=0.6475, Val SSIM=0.6493, Iter Train=215.0, Iter Val=233.0, Time Epoch=427.48 sec
+Epoch 5: Train MSE=0.001746, Val MSE=0.001659, Train PSNR=28.45 dB, Val PSNR=28.66 dB, Train SSIM=0.6477, Val SSIM=0.6494, Iter Train=218.0, Iter Val=233.0, Time Epoch=427.56 sec
+Epoch 6: Train MSE=0.001739, Val MSE=0.001659, Train PSNR=28.47 dB, Val PSNR=28.66 dB, Train SSIM=0.6477, Val SSIM=0.6494, Iter Train=219.0, Iter Val=233.0, Time Epoch=426.84 sec
+Epoch 7: Train MSE=0.001748, Val MSE=0.001668, Train PSNR=28.45 dB, Val PSNR=28.63 dB, Train SSIM=0.6476, Val SSIM=0.6493, Iter Train=213.0, Iter Val=233.0, Time Epoch=427.51 sec
+Epoch 8: Train MSE=0.001748, Val MSE=0.001662, Train PSNR=28.45 dB, Val PSNR=28.65 dB, Train SSIM=0.6477, Val SSIM=0.6495, Iter Train=219.0, Iter Val=233.0, Time Epoch=426.74 sec
+Epoch 9: Train MSE=0.001740, Val MSE=0.001659, Train PSNR=28.47 dB, Val PSNR=28.66 dB, Train SSIM=0.6479, Val SSIM=0.6495, Iter Train=213.0, Iter Val=233.0, Time Epoch=430.45 sec
+Epoch 10: Train MSE=0.001737, Val MSE=0.001661, Train PSNR=28.48 dB, Val PSNR=28.65 dB, Train SSIM=0.6480, Val SSIM=0.6495, Iter Train=215.0, Iter Val=233.0, Time Epoch=430.36 sec
+Epoch 11: Train MSE=0.001741, Val MSE=0.001665, Train PSNR=28.47 dB, Val PSNR=28.64 dB, Train SSIM=0.6479, Val SSIM=0.6494, Iter Train=214.0, Iter Val=233.0, Time Epoch=428.14 sec
+Epoch 12: Train MSE=0.001751, Val MSE=0.001663, Train PSNR=28.44 dB, Val PSNR=28.65 dB, Train SSIM=0.6475, Val SSIM=0.6495, Iter Train=215.0, Iter Val=233.0, Time Epoch=425.93 sec
+Epoch 13: Train MSE=0.001740, Val MSE=0.001659, Train PSNR=28.47 dB, Val PSNR=28.66 dB, Train SSIM=0.6479, Val SSIM=0.6495, Iter Train=215.0, Iter Val=233.0, Time Epoch=426.30 sec
+Epoch 14: Train MSE=0.001738, Val MSE=0.001662, Train PSNR=28.48 dB, Val PSNR=28.65 dB, Train SSIM=0.6480, Val SSIM=0.6494, Iter Train=218.0, Iter Val=233.0, Time Epoch=425.69 sec
+Epoch 15: Train MSE=0.001741, Val MSE=0.001664, Train PSNR=28.47 dB, Val PSNR=28.64 dB, Train SSIM=0.6479, Val SSIM=0.6494, Iter Train=214.0, Iter Val=233.0, Time Epoch=426.92 sec
+Epoch 16: Train MSE=0.001744, Val MSE=0.001663, Train PSNR=28.46 dB, Val PSNR=28.64 dB, Train SSIM=0.6478, Val SSIM=0.6495, Iter Train=215.0, Iter Val=233.0, Time Epoch=428.11 sec
+Epoch 17: Train MSE=0.001743, Val MSE=0.001661, Train PSNR=28.46 dB, Val PSNR=28.65 dB, Train SSIM=0.6478, Val SSIM=0.6495, Iter Train=213.0, Iter Val=233.0, Time Epoch=428.06 sec
+Epoch 18: Train MSE=0.001738, Val MSE=0.001660, Train PSNR=28.48 dB, Val PSNR=28.65 dB, Train SSIM=0.6481, Val SSIM=0.6496, Iter Train=217.0, Iter Val=233.0, Time Epoch=427.50 sec
+Epoch 19: Train MSE=0.001738, Val MSE=0.001662, Train PSNR=28.47 dB, Val PSNR=28.65 dB, Train SSIM=0.6480, Val SSIM=0.6495, Iter Train=215.0, Iter Val=233.0, Time Epoch=427.26 sec
+Epoch 20: Train MSE=0.001745, Val MSE=0.001662, Train PSNR=28.45 dB, Val PSNR=28.65 dB, Train SSIM=0.6478, Val SSIM=0.6496, Iter Train=218.0, Iter Val=233.0, Time Epoch=426.80 sec
+Epoch 21: Train MSE=0.001740, Val MSE=0.001660, Train PSNR=28.47 dB, Val PSNR=28.65 dB, Train SSIM=0.6480, Val SSIM=0.6496, Iter Train=217.0, Iter Val=233.0, Time Epoch=426.65 sec
+Epoch 22: Train MSE=0.001741, Val MSE=0.001661, Train PSNR=28.47 dB, Val PSNR=28.65 dB, Train SSIM=0.6480, Val SSIM=0.6496, Iter Train=217.0, Iter Val=233.0, Time Epoch=427.15 sec
+Epoch 23: Train MSE=0.001740, Val MSE=0.001660, Train PSNR=28.47 dB, Val PSNR=28.65 dB, Train SSIM=0.6480, Val SSIM=0.6495, Iter Train=216.0, Iter Val=233.0, Time Epoch=427.32 sec
+Epoch 24: Train MSE=0.001743, Val MSE=0.001661, Train PSNR=28.46 dB, Val PSNR=28.65 dB, Train SSIM=0.6479, Val SSIM=0.6496, Iter Train=213.0, Iter Val=233.0, Time Epoch=428.00 sec
+Epoch 25: Train MSE=0.001740, Val MSE=0.001657, Train PSNR=28.47 dB, Val PSNR=28.66 dB, Train SSIM=0.6480, Val SSIM=0.6497, Iter Train=216.0, Iter Val=233.0, Time Epoch=427.77 sec
+Epoch 26: Train MSE=0.001729, Val MSE=0.001656, Train PSNR=28.50 dB, Val PSNR=28.67 dB, Train SSIM=0.6482, Val SSIM=0.6497, Iter Train=213.0, Iter Val=233.0, Time Epoch=427.02 sec
+Epoch 27: Train MSE=0.001738, Val MSE=0.001666, Train PSNR=28.48 dB, Val PSNR=28.64 dB, Train SSIM=0.6481, Val SSIM=0.6495, Iter Train=216.0, Iter Val=233.0, Time Epoch=425.91 sec
+Total training time: 11545.06 seconds
+Mean time per epoch: 427.59 seconds
