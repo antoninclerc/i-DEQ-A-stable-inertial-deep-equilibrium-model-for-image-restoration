@@ -1,109 +1,149 @@
-# Train DEQ models – run_training.py
+# i-DEQ: A Stable Inertial Deep Equilibrium Model for Image Restoration
+
+This repository contains the official implementation of **i-DEQ: A Stable Inertial Deep Equilibrium Model for Image Restoration**.
+
+Implemented methods include:
+
+- Deep Equilibrium Models (DEQ)
+- Unrolled networks (VarNet / MoDL)
+- Diffusion-based reconstruction (DiffPIR-style)
+- Grid search for hyperparameter selection
+
+The methods are evaluated on:
+
+- MRI reconstruction (FastMRI)
+- Image inpainting (BSDS500)
+- Rician denoising (BSDS500)
+
+---
+
+# 1. Installation
+
+```bash
+pip install -r requirements.txt
+
+# 2. Dataset Structure
+Expected dataset layout:
+
+DATA/
+├── MRI/
+│   ├── singlecoil_train/
+│   ├── singlecoil_val/
+│   └── singlecoil_test/
+│
+└── BSDS500/
+    ├── train/
+    ├── val/
+    └── test/
+
+# 3. Main components
+
+## Train DEQ models – run_training.py
 Allow users to train differents DEQ models.
 
-## CLI Arguments
+### CLI Arguments
 
-### Required Arguments
+#### Required Arguments
 
-#### `--problem` (str)
+##### `--problem` (str)
 Options: `mri | inpainting | rician`  
 Type of inverse problem.
 
-#### `--dc` (str)
+##### `--dc` (str)
 Options: `grad | prox`  
 Data-consistency operator.
 
-#### `--data_root` (str)
+##### `--data_root` (str)
 Path to dataset root directory. 
 Defaults : 'DATA'
 
-#### `--save_dir` (str)
+##### `--save_dir` (str)
 Directory where checkpoints and logs are saved.
 
 ---
 
-### Training hyperparameters
+#### Training hyperparameters
 
-#### `--lr` (float, default=1e-5)
+##### `--lr` (float, default=1e-5)
 Learning rate.
 
-#### `--max_epochs` (int, default=500)
+##### `--max_epochs` (int, default=500)
 Number of training epochs.
 
-#### `--max_iter` (int, default=200)
+##### `--max_iter` (int, default=200)
 Maximum number of DEQ iterations.
 
-#### `--init_train` (bool, default=False)
+##### `--init_train` (bool, default=False)
 Enables 20 iterations with higher denoising parameter sigma_denoiser = 0.2. Recommanded for inpainting tasks.
 
 ---
 
-### Model parameters
+#### Model parameters
 
-#### `--lambda_dc` (float, default=0.1)
+##### `--lambda_dc` (float, default=0.1)
 Weight of the data-consistency term.
 
-#### `--backtracking` (bool, default=True)
+##### `--backtracking` (bool, default=True)
 Enables backtracking line-search.
 
-#### `--lambda_Rtheta` (float, default=0.83)
+##### `--lambda_Rtheta` (float, default=0.83)
 Weight of the network regularization term.
 
 
 ---
 
-### Optimization / stability
+#### Optimization / stability
 
-#### `--learn_lambda_dc` (bool, default=True)
+##### `--learn_lambda_dc` (bool, default=True)
 Whether λ_dc is learned during training.
 
-#### `--learn_lambda_Rtheta` (bool, default=True)
+##### `--learn_lambda_Rtheta` (bool, default=True)
 Whether λ_Rθ is learned during training.
 
 ---
 
-### DEQ dynamics / restart
+#### DEQ dynamics / restart
 
-#### `--accelerated` (bool, default=True)
+##### `--accelerated` (bool, default=True)
 Enables accelerated DEQ with restart mechanism.
 
-#### `--B_restart` (int, default=100)
+##### `--B_restart` (int, default=100)
 Restart period for DEQ iterations.
 
-#### `--theta_interpol` (float, default=0.2)
+##### `--theta_interpol` (float, default=0.2)
 Interpolation parameter θ.
 
-#### `--learn_theta_interpol` (bool, default=True)
+##### `--learn_theta_interpol` (bool, default=True)
 Whether θ is learned during training.
 
 ---
 
-### Noise model
+#### Noise model
 
-#### `--noise` (float, default=1/255)
+##### `--noise` (float, default=1/255)
 Observation noise level.
 
-#### `--sigma_denoiser` (float, default=0.03)
+##### `--sigma_denoiser` (float, default=0.03)
 Noise level used in the denoiser.
 
 ---
 
-### System
+#### System
 
-#### `--device` (str, default=cuda:0)
+##### `--device` (str, default=cuda:0)
 Device used for training.
 
-#### `--PnP` (bool, default=False)
+##### `--PnP` (bool, default=False)
 Use the PnP (and not RED) approach.
 ---
 
-# Grid Search – main_gridsearch.py
+## Grid Search – main_gridsearch.py
 
 This project includes an automated grid search procedure to tune the hyperparameters of the PnP-based reconstruction models for MRI, inpainting, and Rician denoising tasks.
 
 ---
 
-## Overview
+### Overview
 
 The grid search evaluates multiple combinations of:
 - regularization strength (`lambda_Rtheta`)
@@ -113,11 +153,11 @@ The grid search evaluates multiple combinations of:
 Each configuration is trained/evaluated independently, and metrics (PSNR/SSIM) are stored per run.
 
 ---
-## CLI Arguments
+### CLI Arguments
 
-### Required arguments
+#### Required arguments
 
-#### `--problem` (str)
+##### `--problem` (str)
 Options: `mri | inpainting | rician`  
 Defines the inverse problem to solve.
 
@@ -127,7 +167,7 @@ Defines the inverse problem to solve.
 
 ---
 
-#### `--dc` (str)
+##### `--dc` (str)
 Options: `grad | prox`  
 Defines the data-consistency operator used in the reconstruction model.
 
@@ -136,16 +176,16 @@ Defines the data-consistency operator used in the reconstruction model.
 
 ---
 
-### Training / execution mode
+#### Training / execution mode
 
-#### `--accelerated` (bool, default=True)
+##### `--accelerated` (bool, default=True)
 Enables accelerated variants of the reconstruction algorithm:
 - faster convergence
 - modified iteration scheme
 
 ---
 
-#### `--PnP` (bool, default=False)
+##### `--PnP` (bool, default=False)
 Enables Plug-and-Play formulation instead of the default reconstruction framework.
 
 - `True`: Plug-and-Play denoiser-based reconstruction
@@ -153,13 +193,13 @@ Enables Plug-and-Play formulation instead of the default reconstruction framewor
 
 ---
 
-# Unrolling Experiments (VarNet / MoDL) - run_unrolling.py
+## Unrolling Experiments (VarNet / MoDL) - run_unrolling.py
 
 This section describes classical unrolled reconstruction models for MRI.
 
 ---
 
-## Overview
+### Overview
 
 Two architectures are supported:
 
@@ -173,12 +213,12 @@ Both combine:
 
 ---
 
-## CLI Arguments
+### CLI Arguments
 
 
-### Mode selection
+#### Mode selection
 
-#### `--mode` (str, required)
+##### `--mode` (str, required)
 Options: `VarNet | MoDL`  
 Defines the type of unrolled architecture.
 
@@ -187,9 +227,9 @@ Defines the type of unrolled architecture.
 
 ---
 
-### Execution flags
+#### Execution flags
 
-#### `--train` (flag)
+##### `--train` (flag)
 If set, enables training phase.
 
 - runs optimization over training set
@@ -198,7 +238,7 @@ If set, enables training phase.
 
 ---
 
-#### `--test` (flag)
+##### `--test` (flag)
 If set, runs evaluation using the best saved checkpoint.
 
 - computes PSNR / SSIM
@@ -206,38 +246,38 @@ If set, runs evaluation using the best saved checkpoint.
 
 ---
 
-### Optimization hyperparameters
+#### Optimization hyperparameters
 
-#### `--max_iter` (int, default=5)
+##### `--max_iter` (int, default=5)
 Number of unrolling iterations inside the network.
 
 ---
 
-#### `--lambda_dc` (float, default=0.5)
+##### `--lambda_dc` (float, default=0.5)
 Weight of the data-consistency term.
 
 Higher values enforce stronger fidelity to measurements.
 
 ---
 
-#### `--lr` (float, default=1e-4)
+##### `--lr` (float, default=1e-4)
 Learning rate used for training.
 
 ---
 
-#### `--max_epochs` (int, default=500)
+##### `--max_epochs` (int, default=500)
 Maximum number of training epochs.
 
 ---
 
-### Physics configuration
+#### Physics configuration
 
-#### `--acceleration` (int, default=8)
+##### `--acceleration` (int, default=8)
 MRI undersampling factor.
 
 ---
 
-#### `--noise` (float, default=1/255)
+##### `--noise` (float, default=1/255)
 Noise level added to measurements.
 
 Used both in:
@@ -246,9 +286,9 @@ Used both in:
 
 ---
 
-### Dataset configuration
+#### Dataset configuration
 
-#### `--data_root` (str, default=`DATA`)
+##### `--data_root` (str, default=`DATA`)
 Root directory of the dataset.
 
 Expected structure:
@@ -258,9 +298,9 @@ Expected structure:
 
 ---
 
-### Output configuration
+#### Output configuration
 
-#### `--save_dir` (str, required)
+##### `--save_dir` (str, required)
 Directory where:
 
 - trained models
@@ -269,14 +309,11 @@ Directory where:
 
 are stored.
 
-
-
-
-# DIFFPIR experiments - run_DIFFPIR.py
+## DIFFPIR experiments - run_DIFFPIR.py
 
 ---
 
-## Overview
+### Overview
 
 This framework supports two execution modes for diffusion-based reconstruction:
 
@@ -287,7 +324,7 @@ Both modes use the same reconstruction pipeline, but differ in how parameters ar
 
 ---
 
-## Grid search mode
+### Grid search mode
 
 Grid search is used to select good values for the hyperparameters:
 - `lambda` (data-consistency / regularization strength)
@@ -306,7 +343,7 @@ This step is necessary because performance is highly sensitive to noise level an
 
 ---
 
-## Test mode
+### Test mode
 
 Test mode evaluates a single fixed configuration:
 - one value of `lambda`
@@ -321,19 +358,19 @@ This mode is used for:
 
 ---
 
-## Arguments
+### Arguments
 
 ---
 
-### Global setup
+#### Global setup
 
-#### `--problem` (str)
+##### `--problem` (str)
 Options: `mri | inpainting | rician`  
 Defines the inverse problem to solve.
 
 ---
 
-####  `--mode` (str)
+#####  `--mode` (str)
 Options: `grid | test`  
 Execution mode:
 - `grid`: hyperparameter search on validation set
@@ -341,54 +378,54 @@ Execution mode:
 
 ---
 
-####  `--device` (str, default=`cuda:0`)
+#####  `--device` (str, default=`cuda:0`)
 Device used for computation.
 
 ---
 
-### Noise model
+#### Noise model
 
-####  `--noise_level` (float, default=`12.75`)
+#####  `--noise_level` (float, default=`12.75`)
 Standard deviation of the observation noise (image space scale).
 
 ---
 
-#### Test mode parameters (`--mode test`)
+##### Test mode parameters (`--mode test`)
 
 Used only when running a single reconstruction.
 
 ---
 
-####  `--lambda_` (float, default=`10.0`)
+#####  `--lambda_` (float, default=`10.0`)
 Regularization / data-consistency weighting parameter.
 
 ---
 
-####  `--zeta` (float, default=`0.5`)
+#####  `--zeta` (float, default=`0.5`)
 Stochasticity parameter in the reverse diffusion process.
 
 ---
 
-#### Grid search parameters (`--mode grid`)
+##### Grid search parameters (`--mode grid`)
 
 Used only when performing hyperparameter search.
 
 ---
 
-####  `--lambda_min` (float, default=`3.0`)
+#####  `--lambda_min` (float, default=`3.0`)
 Minimum value of λ tested.
 
-####  `--lambda_max` (float, default=`25.0`)
+#####  `--lambda_max` (float, default=`25.0`)
 Maximum value of λ tested.
 
-####  `--n_lambda` (int, default=`10`)
+#####  `--n_lambda` (int, default=`10`)
 Number of sampled λ values (uniform grid between min and max).
 
-####  `--zeta_min` (float, default=`0.0`)
+#####  `--zeta_min` (float, default=`0.0`)
 Minimum value of ζ tested.
 
-####  `--zeta_max` (float, default=`1.0`)
+#####  `--zeta_max` (float, default=`1.0`)
 Maximum value of ζ tested.
 
-####  `--n_zeta` (int, default=`10`)
+#####  `--n_zeta` (int, default=`10`)
 Number of sampled ζ values (uniform grid between min and max).
