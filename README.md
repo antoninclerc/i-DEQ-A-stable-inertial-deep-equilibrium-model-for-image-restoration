@@ -11,10 +11,37 @@ Implemented methods include:
 
 The methods are evaluated on:
 
-- MRI reconstruction (FastMRI)
-- Image inpainting (BSDS500)
-- Rician denoising (BSDS500)
+- MRI reconstruction (FastMRI) [1]
+- Image inpainting (BSDS500) [2]
+- Rician denoising (BSDS500) [2]
 
+@misc{zbontar2018fastMRI,
+    title={{fastMRI}: An Open Dataset and Benchmarks for Accelerated {MRI}},
+    author={Jure Zbontar and Florian Knoll and Anuroop Sriram and Tullie Murrell and Zhengnan Huang and Matthew J. Muckley and Aaron Defazio and Ruben Stern and Patricia Johnson and Mary Bruno and Marc Parente and Krzysztof J. Geras and Joe Katsnelson and Hersh Chandarana and Zizhao Zhang and Michal Drozdzal and Adriana Romero and Michael Rabbat and Pascal Vincent and Nafissa Yakubova and James Pinkerton and Duo Wang and Erich Owens and C. Lawrence Zitnick and Michael P. Recht and Daniel K. Sodickson and Yvonne W. Lui},
+    journal = {ArXiv e-prints},
+    archivePrefix = "arXiv",
+    eprint = {1811.08839},
+    year={2018}
+}
+@Article{amfm_pami2011,
+ author = {Arbelaez, Pablo and Maire, Michael and Fowlkes, Charless and Malik, Jitendra},
+ title = {Contour Detection and Hierarchical Image Segmentation},
+ journal = {IEEE Trans. Pattern Anal. Mach. Intell.},
+ issue_date = {May 2011},
+ volume = {33},
+ number = {5},
+ month = may,
+ year = {2011},
+ issn = {0162-8828},
+ pages = {898--916},
+ numpages = {19},
+ url = {http://dx.doi.org/10.1109/TPAMI.2010.161},
+ doi = {10.1109/TPAMI.2010.161},
+ acmid = {1963088},
+ publisher = {IEEE Computer Society},
+ address = {Washington, DC, USA},
+ keywords = {Contour detection, image segmentation, computer vision.},
+}
 ---
 
 # 1. Installation
@@ -64,6 +91,9 @@ Defaults : 'DATA'
 
 ##### `--save_dir` (str)
 Directory where checkpoints and logs are saved.
+
+##### `--train` (bool)
+train or just run the DEQ from pretrained weights
 
 ---
 
@@ -138,8 +168,35 @@ Noise level used in the denoiser.
 ##### `--device` (str, default=cuda:0)
 Device used for training.
 
-##### `--PnP` (bool, default=False)
-Use the PnP (and not RED) approach.
+---
+### Inference with pretrained model
+
+```bash
+python run_training.py \
+--problem mri \
+--dc grad \
+--train False \
+--lr 1e-5 \
+--max_epochs 500 \
+--max_iter 500 \
+--init_train False \
+--lambda_dc 0.5 \
+--backtracking False \
+--lambda_Rtheta 0.65 \
+--learn_lambda_dc True \
+--learn_lambda_Rtheta True \
+--accelerated True \
+--B_restart 100 \
+--theta_interpol 0.2 \
+--learn_theta_interpol True \
+--noise 0.004 \
+--sigma_denoiser 0.03 \
+--data_root DATA \
+--save_dir DEQ_weights/MRI/iDEQ_200_plus \
+--pretrained None \
+--device cuda:0
+```
+
 ---
 
 ## Grid Search – main_gridsearch.py
@@ -195,6 +252,16 @@ Enables Plug-and-Play formulation instead of the default reconstruction framewor
 
 - `True`: Plug-and-Play denoiser-based reconstruction
 - `False`: standard learned/unrolled formulation
+
+---
+### Example
+
+```bash
+python main_gridsearch.py \
+--problem mri \
+--dc grad \
+--accelerated True
+```
 
 ---
 
@@ -314,6 +381,22 @@ Directory where:
 
 are stored.
 
+---
+### Example
+```bash
+python run_unrolling.py \
+--mode VarNet \
+--train \
+--test \
+--max_iter 5 \
+--lambda_dc 0.5 \
+--lr 1e-4 \
+--max_epochs 500 \
+--acceleration 8 \
+--noise 0.00390625 \
+--data_root DATA \
+--save_dir runs/unrolling_experiment
+```
 ---
 
 ## DIFFPIR experiments - run_DIFFPIR.py
@@ -436,3 +519,20 @@ Maximum value of ζ tested.
 
 #####  `--n_zeta` (int, default=`10`)
 Number of sampled ζ values (uniform grid between min and max).
+
+---
+### Example
+```bash
+python main.py \
+--problem mri \
+--mode test \
+--lambda_ 10.0 \
+--zeta 0.5 \
+--noise_level 12.75 \
+--device cuda:0
+```
+---
+
+#References
+[1] J. Zbontar, F. Knoll, A. Sriram, T. Murrell, Z. Huang, M. J. Muckley, A. Defazio, R. Stern, P. Johnson, M. Bruno, et al. fastMRI: An Open Dataset and Benchmarks for Accelerated MRI. arXiv preprint arXiv:1811.08839, 2018.
+[2] P. Arbelaez, M. Maire, C. Fowlkes, and J. Malik. Contour Detection and Hierarchical Image Segmentation. IEEE Transactions on Pattern Analysis and Machine Intelligence, 33(5):898–916, 2011.

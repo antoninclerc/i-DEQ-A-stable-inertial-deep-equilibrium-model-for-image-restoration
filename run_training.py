@@ -19,6 +19,7 @@ def main():
     # problem setup
     parser.add_argument("--problem", required=True, choices=["mri", "inpainting", "rician"])
     parser.add_argument("--dc", required=True, choices=["grad", "prox"])
+    parser.add_argument("--train", type=str2bool, default=True)
 
     # training hyperparams
     parser.add_argument("--lr", type=float, default=1e-5)
@@ -133,23 +134,24 @@ def main():
     # -------------------------
     # training
     # -------------------------
-    model.train_model(
-        train_loader=train_loader,
-        val_loader=val_loader,
-        accelerated=args.accelerated,
-        init_train=init_train_params,
-        JFB=True,
-        K_JFB=0.,
-        lr=args.lr,
-        optimizer=torch.optim.Adam,
-        optimizer_kwargs={"betas": (0.9, 0.999)},
-        scheduler=None,
-        scheduler_kwargs=None,
-        max_patience=25,
-        max_epochs=args.max_epochs,
-        plot_interval=1,
-        pretrained_path=args.pretrained,
-    )
+    if args.train:
+        model.train_model(
+            train_loader=train_loader,
+            val_loader=val_loader,
+            accelerated=args.accelerated,
+            init_train=init_train_params,
+            JFB=True,
+            K_JFB=0.,
+            lr=args.lr,
+            optimizer=torch.optim.Adam,
+            optimizer_kwargs={"betas": (0.9, 0.999)},
+            scheduler=None,
+            scheduler_kwargs=None,
+            max_patience=25,
+            max_epochs=args.max_epochs,
+            plot_interval=1,
+            pretrained_path=args.pretrained,
+        )
 
     # -------------------------
     # evaluation
