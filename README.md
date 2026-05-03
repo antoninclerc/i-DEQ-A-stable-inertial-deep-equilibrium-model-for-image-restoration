@@ -21,6 +21,7 @@ The methods are evaluated on:
 
 ```bash
 pip install -r requirements.txt
+```
 
 # 2. Dataset Structure
 Expected dataset layout:
