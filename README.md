@@ -39,6 +39,8 @@ DATA/
     |-- test/
 ```
 
+---
+
 # 3. Main components
 
 ## Train DEQ models – run_training.py
@@ -311,6 +313,8 @@ Directory where:
 - evaluation results
 
 are stored.
+
+---
 
 ## DIFFPIR experiments - run_DIFFPIR.py
 
