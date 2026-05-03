@@ -26,16 +26,18 @@ pip install -r requirements.txt
 # 2. Dataset Structure
 Expected dataset layout:
 
+```
 DATA/
-├── MRI/
-│   ├── singlecoil_train/
-│   ├── singlecoil_val/
-│   └── singlecoil_test/
-│
-└── BSDS500/
-    ├── train/
-    ├── val/
-    └── test/
+|-- MRI/
+|   |-- singlecoil_train/
+|   |-- singlecoil_val/
+|   |-- singlecoil_test/
+|
+|-- BSDS500/
+    |-- train/
+    |-- val/
+    |-- test/
+```
 
 # 3. Main components
 
