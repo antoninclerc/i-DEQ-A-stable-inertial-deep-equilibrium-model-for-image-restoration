@@ -97,6 +97,7 @@ class DeepEquilibrium(nn.Module):
             self.lambda_dc = lambda_dc
         else:
             self.lambda_dc = lambda_dc if not learn_lambda_dc else torch.nn.Parameter(torch.tensor(lambda_dc))
+            self.tau0 = self.lambda_dc  # Initialize tau0 to lambda_dc for backtracking
 
         self.lambda_Rtheta = lambda_Rtheta if not learn_lambda_Rtheta else torch.nn.Parameter(torch.tensor(lambda_Rtheta))
         self.DC_type = DC_type
@@ -117,6 +118,8 @@ class DeepEquilibrium(nn.Module):
         self.max_iter = max_iter
         self.sigma_noise = sigma_noise
         self.sigma_denoiser = sigma_denoiser
+
+        self.learn_theta_interpol = learn_theta_interpol
 
         # -----------------------------
         # Acceleration / restart
@@ -145,7 +148,7 @@ class DeepEquilibrium(nn.Module):
             self.forward_op = Forward_MRI
             self.adjoint_op = Adjoint_MRI
             self.noise_type = 'gaussian'
-        elif self.problem == "Inpainting":
+        elif self.problem == "inpainting":
             if self.DC_type == "prox":
                 self.DC = DC_prox_inpainting
             elif self.DC_type == "grad":
@@ -199,7 +202,7 @@ class DeepEquilibrium(nn.Module):
         # Initial reconstruction
         if self.problem == "MRI" or self.problem == "rician":
             x_curr = self.Adjoint(y, mask) # Start from zero-filled reconstruction for MRI and Rician
-        elif self.problem == "Inpainting":
+        elif self.problem == "inpainting":
             x_curr = self.Adjoint(y, mask)  + (1 - mask) * 0.5  # Start from a constant image (could also start from zero-filled)
 
         x_curr = torch.clamp(x_curr, 0, 1.0)  # Ensure initial image is in valid range
@@ -239,9 +242,9 @@ class DeepEquilibrium(nn.Module):
                 # condition = lambda: iter_num < self.max_iter
             else:
                 condition = lambda: (iter_num < self.max_iter and eps > self.thresh)
-            
+            times = [] 
             while condition():
-
+                time_start_iter = time.time()
                 if self.accelerated:
                     # inertial extrapolation
                     z = x_curr + (1 - self.theta) * (x_curr - x_prev)
@@ -283,8 +286,6 @@ class DeepEquilibrium(nn.Module):
 
                 tau0 = tau if self.backtracking else tau0
 
-                # x_next = torch.clamp(x_next, 0, 1.0)
-
                 # --- update variables ---
                 x_prev = x_curr.detach()
                 x_curr = x_next.detach()
@@ -307,11 +308,11 @@ class DeepEquilibrium(nn.Module):
                 if total_iter > iter_pretraining and self.init_train is not None:
                     self.backtracking = train_backtracking  # Restore backtracking setting after pretraining
                     self.sigma_denoiser = train_sigma  # Restore denoiser noise level after pretraining
-                    # On print à la première occurence où on dépasse les itérations de pré-entraînement pour éviter d'avoir des logs de pré-entraînement
+
                     if total_iter == iter_pretraining + 1:
                         print(f"Pretraining complete. Resuming with backtracking={self.backtracking} and sigma_denoiser={self.sigma_denoiser}.")
                         tau0 = torch.tensor(self.lambda_dc, device=self.device) if self.backtracking else self.lambda_dc
-                        print(f"Reset tau0 to {tau0.item()} after pretraining.")
+                        print(f"Reset tau0 after pretraining.")
 
                 if total_iter > 2000:
                     raise ValueError("Exceeded maximum allowed iterations, possible divergence.")
@@ -332,24 +333,15 @@ class DeepEquilibrium(nn.Module):
                     raise ValueError(
                         f"Divergence detected at iteration {iter_num} with eps={eps.item()}"
                     )
-
+                time_end_iter = time.time()
+                times.append(time_end_iter - time_start_iter)
         stats = {
             "iter_num": total_iter,
-            "epsilons": epsilons
+            "epsilons": epsilons,
+            "times": times
         }
         self.tau0 = tau0 if self.backtracking else self.lambda_dc
 
-        # if self.accelerated:
-        #     K_2 = self.max_iter // 2
-
-        #     sum_diff = [
-        #         torch.norm(inter_restart[k+1] - inter_restart[k]).item()
-        #         for k in range(K_2, len(inter_restart) - 1)
-        #     ]
-        #     K0 = np.argmin(sum_diff) + K_2
-        #     outputs = torch.stack(inter_restart[:K0+1]).mean(dim=0)
-        # else:
-        #     outputs = x_curr
         outputs = x_curr
         return outputs, intermediate_outputs, stats
     
@@ -357,7 +349,7 @@ class DeepEquilibrium(nn.Module):
 
         if self.problem == "MRI" or self.problem == "rician":
             image = self.Adjoint(y, mask) 
-        elif self.problem == "Inpainting":
+        elif self.problem == "inpainting":
             image = self.Adjoint(y, mask)  + (1 - mask) * 0.5  # Start from a constant image (could also start from zero-filled)
 
         image = torch.clamp(image, 0, 1.0)  # Ensure initial image is in valid range
@@ -404,7 +396,7 @@ class DeepEquilibrium(nn.Module):
                 if niter > iter_pretraining and self.init_train is not None:
                     self.backtracking = train_backtracking  # Restore backtracking setting after pretraining
                     self.sigma_denoiser = train_sigma  # Restore denoiser noise level after pretraining
-                    # On print à la première occurence où on dépasse les itérations de pré-entraînement pour éviter d'avoir des logs de pré-entraînement
+
                     if niter == iter_pretraining + 1:
                         print(f"Pretraining complete. Resuming with backtracking={self.backtracking} and sigma_denoiser={self.sigma_denoiser}.")
                 print(f"Iteration {niter}: eps = {eps:.6f}")
@@ -460,6 +452,7 @@ class DeepEquilibrium(nn.Module):
         # -------------------------------------------------
         # Optional pretrained loading
         # -------------------------------------------------
+
         if pretrained_path is not None:
             load_pretrained(
                 model=self,
@@ -526,7 +519,7 @@ class DeepEquilibrium(nn.Module):
                 epoch_iter_nums = []
                 epoch_iter_nums_val = []            
 
-                outputs, _, stats = self.forward(batch_input, batch_mask)
+                outputs, intermediates, stats = self.forward(batch_input, batch_mask)
                 
                 epoch_iter_nums.append(stats["iter_num"])
 
@@ -537,6 +530,7 @@ class DeepEquilibrium(nn.Module):
                     # JFB uses fixed-point z_fixed and single-step one_step internally
                     jacobian_free_backpropagation(
                         z_fixed=outputs,
+                        z_fixed_before=intermediates[-2] if len(intermediates) > 1 else outputs,  # Use previous intermediate as z_fixed_before for acceleration
                         mask=batch_mask,
                         loss_fn=self.criterion,
                         target=batch_target,
@@ -554,6 +548,8 @@ class DeepEquilibrium(nn.Module):
                         lambda_Rtheta=self.lambda_Rtheta,
                         gamma=self.gamma,
                         eta=self.eta,
+                        theta=self.theta,
+                        accelerated=self.accelerated,
                         backtracking=self.backtracking,
                         K_JFB=self.K_JFB,
                     )
@@ -564,6 +560,10 @@ class DeepEquilibrium(nn.Module):
                     loss.backward()
                 
                 self.optimizer.step()
+
+                with torch.no_grad():
+                    if self.learn_theta_interpol:
+                        self.theta.clamp_(0.0, 1.0)
 
                 mse_list, psnr_list, ssim_list, _ = compute_batch_metrics(
                     outputs, batch_target
@@ -741,6 +741,7 @@ class DeepEquilibrium(nn.Module):
         display_outputs, display_targets, display_inputs = [], [], []
         display_psnr, display_input_psnr = [], []
         display_ssim, display_input_ssim = [], []
+        mean_time = []
         n_collected = 0
 
         # convergence plots
@@ -753,7 +754,7 @@ class DeepEquilibrium(nn.Module):
 
         with torch.no_grad():
             for batch_target, batch_input, batch_mask in test_loader:
-
+                time_reconstruct = time.time()
                 batch_input = batch_input.to(self.device).float()
                     
                 B = batch_input.shape[0]
@@ -773,7 +774,8 @@ class DeepEquilibrium(nn.Module):
                 else:
                     print("Running standard DEQ forward for evaluation...")
                     outputs, intermediates, stats = self.forward(batch_input, batch_mask)
-
+                time_reconstruct = time.time() - time_reconstruct
+                mean_time.append(time_reconstruct)
                 # -----------------------------
                 # Metrics
                 # -----------------------------
@@ -839,32 +841,31 @@ class DeepEquilibrium(nn.Module):
             # ---------------------------------------
             # Global metrics
             # ---------------------------------------
-            def energy(x, y):
-                f = 1/2 * torch.sum((self.forward_op(x, batch_mask) - batch_input)**2) 
-                r = self.lambda_Rtheta * self.Rtheta(x)
-                return f + r
+            # def energy(x, y):
+            #     f = 1/2 * torch.sum((self.forward_op(x, batch_mask) - batch_input)**2) 
+            #     r = self.lambda_Rtheta * self.Rtheta(x)
+            #     return f + r
             
-            energies = []
-            for i in range(len(intermediates)):
-                interm_i = intermediates[i]
-                energy_i = energy(interm_i, batch_input)
-                energies.append(float(energy_i.mean().item()))
+            # energies = []
+            # for i in range(len(intermediates)):
+            #     interm_i = intermediates[i]
+            #     energy_i = energy(interm_i, batch_input)
+            #     energies.append(float(energy_i.mean().item()))
 
-            energy_target = energy(batch_target, batch_input)
-            input_images = self.adjoint_op(batch_input, batch_mask) if self.problem == "MRI" else batch_input
-            energy_input = energy(torch.clamp(input_images, 0, 1), batch_input)
-            energy_rec = energy(outputs, batch_input)
-
+            # energy_target = energy(batch_target, batch_input)
+            # input_images = self.adjoint_op(batch_input, batch_mask) if self.problem == "MRI" else batch_input
+            # energy_input = energy(torch.clamp(input_images, 0, 1), batch_input)
+            # energy_rec = energy(outputs, batch_input)
             
-            plt.figure()
-            plt.plot(energies)
-            plt.xlabel("Iteration")
-            plt.ylabel("Energy")
-            plt.yscale("log")
-            plt.title("Energy evolution")
-            plt.tight_layout()
-            plt.savefig(os.path.join(self.path, "energy_evolution.pdf"), dpi=300)
-            plt.close()
+            # plt.figure()
+            # plt.plot(energies)
+            # plt.xlabel("Iteration")
+            # plt.ylabel("Energy")
+            # plt.yscale("log")
+            # plt.title("Energy evolution")
+            # plt.tight_layout()
+            # plt.savefig(os.path.join(self.path, "energy_evolution.pdf"), dpi=300)
+            # plt.close()
 
             test_mse = float(np.mean(test_mse))
             test_PSNR = float(np.mean(test_PSNR))
@@ -873,6 +874,8 @@ class DeepEquilibrium(nn.Module):
             input_mse = float(np.mean(input_mse))
             input_PSNR = float(np.mean(input_PSNR))
             input_SSIM = float(np.mean(input_SSIM))
+
+            mean_time = float(np.mean(mean_time))
 
             print(f"Test MSE: {test_mse:.6f}, Test PSNR: {test_PSNR:.2f} dB")
             print(f"Input MSE: {input_mse:.6f}, Input PSNR: {input_PSNR:.2f} dB")
@@ -905,6 +908,7 @@ class DeepEquilibrium(nn.Module):
                 plt.ylabel("Relative error")
                 plt.title("Convergence metric")
                 plt.tight_layout()
+                plt.yscale("log")
                 plt.savefig(os.path.join(self.path, "epsilon_evolution.pdf"), dpi=300)
                 plt.close()
 
@@ -943,7 +947,7 @@ class DeepEquilibrium(nn.Module):
 
                     Rtheta_target = self.Rtheta(target_unsqueezed).squeeze().cpu().numpy()
                     Rtheta_recon = self.Rtheta(image_unsqueezed).squeeze().cpu().numpy()
-                    Rtheta_input = self.Rtheta(input_unsqueezed).squeeze().cpu().numpy()
+                    #Rtheta_input = self.Rtheta(input_unsqueezed).squeeze().cpu().numpy()
 
                     error_map = np.abs(image - target)
 
@@ -958,21 +962,21 @@ class DeepEquilibrium(nn.Module):
                     show_image(
                         ax,
                         input_image,
-                        f"Zero-Filled\nPSNR {psnr_input_img:.2f}, SSIM {ssim_input_img:.4f}\nEnergy {energy_input[i]:.2f}"
+                        f"Zero-Filled\nPSNR {psnr_input_img:.2f}, SSIM {ssim_input_img:.4f}"
                     )
 
                     ax = plt.subplot(1,4,2)
                     show_image(
                         ax,
                         image,
-                        f"Reconstruction\nPSNR {psnr_recon:.2f}, SSIM {ssim_recon:.4f}\nEnergy {energy_rec[i]:.2f}"
+                        f"Reconstruction\nPSNR {psnr_recon:.2f}, SSIM {ssim_recon:.4f}"
                     )
 
                     ax = plt.subplot(1,4,3)
                     show_image(
                         ax,
                         target,
-                        "Ground Truth\nEnergy {:.2f}".format(energy_target[i])
+                        "Ground Truth"
                     )
 
                     ax = plt.subplot(1,4,4)
@@ -987,11 +991,55 @@ class DeepEquilibrium(nn.Module):
                     plt.savefig(os.path.join(self.path, f"test_reconstruction_{i}.pdf"))
                     plt.close()
 
+                    # Only the reconstruction
+                    plt.figure(figsize=(5,5))
+                    ax = plt.subplot(1,1,1)
+                    show_image(
+                        ax,
+                        image,
+                        f"PSNR {psnr_recon:.2f}, SSIM {ssim_recon:.4f}"
+                    )
+                    plt.tight_layout()
+                    plt.savefig(os.path.join(self.path, f"test_reconstruction_only_{i}.pdf"), dpi=300)
+                    plt.close()
+
+                    # Only the ground truth
+                    plt.figure(figsize=(5,5))
+                    ax = plt.subplot(1,1,1)
+                    show_image(
+                        ax,
+                        target,
+                        "Ground Truth"
+                    )
+                    plt.tight_layout()
+                    plt.savefig(os.path.join(self.path, f"test_ground_truth_only_{i}.pdf"), dpi=300)
+                    plt.close()
+
+                    # Only the input image
+                    plt.figure(figsize=(5,5))
+                    ax = plt.subplot(1,1,1)
+                    show_image(
+                        ax,
+                        input_image,
+                        f"Zero-Filled\nPSNR {psnr_input_img:.2f}, SSIM {ssim_input_img:.4f}"
+                    )
+                    plt.tight_layout()
+                    plt.savefig(os.path.join(self.path, f"test_input_image_only_{i}.pdf"), dpi=300)
+                    plt.close()
+
+        times = stats["times"] if "times" in stats else None
+        with open(os.path.join(self.path, "test_times.txt"), "w") as f:
+            f.write(f"Time per iteration: {times}\n")
+
         return {
             "test_mse": test_mse,
             "test_PSNR": test_PSNR,
             "input_mse": input_mse,
             "input_PSNR": input_PSNR,
             "test_SSIM": test_SSIM,
-            "input_SSIM": input_SSIM
+            "input_SSIM": input_SSIM,
+            "PSNR_list": psnr_curve,
+            "mean_time": mean_time,
+            #"Energy_list": energies,
+
         }

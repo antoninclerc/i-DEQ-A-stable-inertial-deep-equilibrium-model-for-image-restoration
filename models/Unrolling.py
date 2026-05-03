@@ -9,8 +9,7 @@ import time
 
 from models.data_consistency import (
     DC_prox_MRI, DC_grad_MRI, Adjoint_MRI, Forward_MRI, 
-    DC_prox_inpainting, DC_grad_inpainting, Forward_inpainting, Adjoint_inpainting,
-    DC_prox_Rician, DC_grad_Rician, Forward_Rician, Adjoint_Rician)
+)
 
 from utils import (
     image_2ch_to_magnitude,
@@ -232,6 +231,7 @@ class Unrolling(nn.Module):
         total_params = sum(p.numel() for p in self.parameters() if p.requires_grad)
         print(f"Total trainable parameters: {total_params}")
         time_start = time.time()
+
         # =================================================
         # Training loop
         # =================================================
@@ -589,6 +589,18 @@ class Unrolling(nn.Module):
 
                     plt.tight_layout()
                     plt.savefig(os.path.join(self.path, f"test_reconstruction_{i}.pdf"), dpi=300)
+                    plt.close()
+
+                    # Only the reconstruction
+                    plt.figure(figsize=(5,5))
+                    ax = plt.subplot(1,1,1)
+                    show_image(
+                        ax,
+                        image,
+                        f"PSNR {psnr_recon:.2f}, SSIM {ssim_recon:.4f}"
+                    )
+                    plt.tight_layout()
+                    plt.savefig(os.path.join(self.path, f"test_reconstruction_only_{i}.pdf"), dpi=300)
                     plt.close()
 
         return {

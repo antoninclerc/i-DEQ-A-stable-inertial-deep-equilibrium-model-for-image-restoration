@@ -1,0 +1,12 @@
+Parameters:
+Lambda: 12.0
+Zeta: 0.3
+Diffusion Steps: 20
+t_start: 200
+Noise Level (Image): 1.0
+Degradation: mri
+
+Mean PSNR: 25.3556 dB
+
+Mean SSIM: 0.4388
+

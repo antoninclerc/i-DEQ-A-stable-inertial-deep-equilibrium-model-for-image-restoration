@@ -1,6 +1,7 @@
 import torch
 import os
 import numpy as np
+import argparse
 import matplotlib.pyplot as plt
 from skimage.metrics import peak_signal_noise_ratio, mean_squared_error, structural_similarity
 
@@ -12,25 +13,33 @@ def add_zero_channel(x: torch.Tensor) -> torch.Tensor:
     return torch.cat([x, torch.zeros_like(x)], dim=1)
 
 def process_image(tensor):
-    """Convert 2-channel tensor to normalized 1-channel magnitude and detach."""
     return normalize_image(image_2ch_to_magnitude(tensor)).detach().cpu()
+
+def str2bool(v):
+    if isinstance(v, bool):
+        return v
+    v = v.lower()
+    if v in ("true", "1", "yes", "y"):
+        return True
+    if v in ("false", "0", "no", "n"):
+        return False
+    raise argparse.ArgumentTypeError("Boolean expected")
+
+def normalize_problem(p):
+    p = p.lower()
+    if p == "mri":
+        return "MRI"
+    if p == "inpainting":
+        return "inpainting"
+    if p == "rician":
+        return "rician"
+    raise ValueError(p)
 
 # ============================================================
 # DATASET UTILITIES
 # ============================================================
 
 def load_pretrained(model, checkpoint_path, device=None, optimizer=None, load_optimizer=False):
-    """
-    Load a pretrained model from a checkpoint.
-    If some parameters are missing, they are randomly initialized.
-
-    Args:
-        model (torch.nn.Module): the model instance to load weights into
-        checkpoint_path (str): path to the checkpoint (.pth)
-        device (torch.device or str, optional): device for loading the checkpoint
-        optimizer (torch.optim.Optimizer, optional): optimizer to load state into
-        load_optimizer (bool): whether to load optimizer state
-    """
     if not os.path.exists(checkpoint_path):
         raise FileNotFoundError(f"No checkpoint found at {checkpoint_path}")
 
@@ -175,7 +184,10 @@ def fast_irl1(z, y, sigma, lambda_dc, max_iter=10):
 # OPTIMIZATION / ALGORITHMIC STEPS
 # ============================================================
 
-def one_step_PGD_back(image, obs, mask, DC, R, nabla_R, lambda_dc, lambda_Rtheta, gamma, eta, forward_op, noise_type, sigma):
+def one_step_PGD_back(image, obs, mask, 
+                      DC, R, nabla_R, lambda_dc, lambda_Rtheta, 
+                      gamma, eta, 
+                      forward_op, noise_type, sigma):
     
     def f(z, y):
         if noise_type == 'gaussian':
@@ -192,11 +204,16 @@ def one_step_PGD_back(image, obs, mask, DC, R, nabla_R, lambda_dc, lambda_Rtheta
         else:
             return DC(z, y, sigma, lambda_dc)
     
-    image, tau = prox_backtracking(x=image, y=obs, prox_f=prox, nabla_R=nabla_R, F=F, tau0=lambda_dc, lambda_Rtheta=lambda_Rtheta, gamma=gamma, eta=eta)
+    image, tau = prox_backtracking(x=image, y=obs, prox_f=prox, nabla_R=nabla_R, F=F, 
+                                   tau0=lambda_dc, lambda_Rtheta=lambda_Rtheta, 
+                                   gamma=gamma, eta=eta)
 
     return image, tau
 
-def one_step_GD_back(image, obs, mask, R, nabla_R, lambda_dc, lambda_Rtheta, gamma, eta, forward_op, adjoint_op, noise_type, sigma):
+def one_step_GD_back(image, obs, mask, 
+                     R, nabla_R, lambda_dc, lambda_Rtheta, 
+                     gamma, eta, 
+                     forward_op, adjoint_op, noise_type, sigma):
     
     def f(z, y):
         if noise_type == 'gaussian':
@@ -265,7 +282,6 @@ def backtracking(x, y, f, gradf, R, gradR, tau0, lambda_Rtheta, gamma, eta):
     def grad_phi(x_):
         return gradf(x_, y) + lambda_Rtheta * gradR(x_)
 
-    x_orig = x
     Phix = Phi(x, y)
     grad_phi_x = grad_phi(x)
     grad_norm_sq = torch.sum(grad_phi_x**2, dim=(1,2,3))
@@ -282,7 +298,7 @@ def backtracking(x, y, f, gradf, R, gradR, tau0, lambda_Rtheta, gamma, eta):
             Phi_try = Phi(Tx_try, y)
 
             armijo_rhs = Phix - gamma * tau * grad_norm_sq
-            # print(Phi_try, armijo_rhs, end="\r")
+
             condition = Phi_try <= armijo_rhs
 
             for i, idx in enumerate(active_idx):
@@ -298,9 +314,7 @@ def backtracking(x, y, f, gradf, R, gradR, tau0, lambda_Rtheta, gamma, eta):
             if n_iter > 100:
                 print("Warning: backtracking exceeded 100 iterations")
                 raise RuntimeError("Backtracking line search did not converge after 100 iterations")
-                break
 
-    # étape finale différentiable
     Tx = x - tau.view(-1,1,1,1) * grad_phi_x
 
     return Tx, tau
@@ -355,7 +369,6 @@ def prox_backtracking(
                 if lhs[i] == 0.0:
                     active[idx] = False  # If no improvement, stop backtracking
 
-    # étape finale différentiable
     zk = xk - tau.view(-1,1,1,1) * nabla_Rxk
     x_next = prox_f(zk, y, tau)
 
@@ -383,43 +396,12 @@ def restart_condition(intermediates, B_restart):
 # ============================================================
 
 def MSE(output, target):
-    """
-    Compute Mean Squared Error between two tensors.
-
-    Parameters
-    ----------
-    output : torch.Tensor
-        Reconstructed image tensor.
-    target : torch.Tensor
-        Ground truth image tensor.
-
-    Returns
-    -------
-    float
-        Mean squared error value.
-    """
     return mean_squared_error(
         output.detach().cpu().numpy(),
         target.detach().cpu().numpy()
     )
     
 def MSE_batch(output, target):
-    """
-    Compute MSE for each element of a batch.
-
-    Parameters
-    ----------
-    output : torch.Tensor
-        Tensor of shape (B, C, H, W) or (C, H, W).
-    target : torch.Tensor
-        Tensor with the same shape.
-
-    Returns
-    -------
-    torch.Tensor
-        Tensor containing MSE for each batch element.
-    """
-
     if output.ndim == 4:  # Batch
         mse_list = [
             mean_squared_error(
@@ -439,23 +421,7 @@ def MSE_batch(output, target):
     return torch.tensor(mse_list, device=output.device)
 
 def PSNR(output, target):
-    """
-    Compute PSNR for each element of a batch.
-
-    Parameters
-    ----------
-    output : torch.Tensor
-        Tensor of shape (B, C, H, W) or (C, H, W).
-    target : torch.Tensor
-        Tensor with the same shape.
-
-    Returns
-    -------
-    torch.Tensor
-        Tensor containing PSNR values.
-    """
-
-    if output.ndim == 3:  # Batch
+    if output.ndim >= 3:  # Batch
         psnr_list = [
             peak_signal_noise_ratio(
                 output[b].detach().cpu().numpy(),
@@ -476,12 +442,13 @@ def PSNR(output, target):
     return torch.tensor(psnr_list, device=output.device)
 
 def SSIM(output, target):
-    if output.ndim == 3:  # Batch
+    if output.ndim >= 3:  # Batch
         ssim_list = [
             structural_similarity(
                 target[b].detach().cpu().numpy(),
                 output[b].detach().cpu().numpy(),
-                data_range=target[b].max().item()
+                data_range=target[b].max().item(),
+                channel_axis=0 if output.shape[1] == 3 else None
                 
             )
             for b in range(output.shape[0])
@@ -491,32 +458,28 @@ def SSIM(output, target):
             structural_similarity(
                 target.detach().cpu().numpy(),
                 output.detach().cpu().numpy(),
-                data_range=target.max().item()
+                data_range=target.max().item(),
+                channel_axis=0 if output.shape[0] == 3 else None
             )
         ]
 
     return torch.tensor(ssim_list, device=output.device)
 
 def compute_batch_metrics(output, target, input_image=None):
-    """
-    Compute MSE and PSNR per sample.
-    Assumes output/target/input are B C H W (C=2 complex or C=1 real).
-    Returns:
-        mse_list, psnr_list, input_psnr_list (if input_image provided)
-    """
-
     # Convert to magnitude if complex
     if output.shape[1] == 2:
         output = image_2ch_to_magnitude(output)
         target = image_2ch_to_magnitude(target)
-    if output.ndim == 4:  # [B, 1, H, W] -> [B, H, W]
-        output = output[:, 0, :, :]
-        target = target[:, 0, :, :]
+    if output.ndim == 4:
+        if output.shape[1] == 1:
+            output = output[:, 0, :, :]
+            target = target[:, 0, :, :]
 
     if input_image is not None and input_image.shape[1] == 2:
         input_image = image_2ch_to_magnitude(input_image)
-    if input_image is not None and input_image.ndim == 4:
-        input_image = input_image[:, 0, :, :]
+    if input_image is not None and input_image.ndim == 4: 
+        if input_image.shape[1] == 1:
+            input_image = input_image[:, 0, :, :]
 
     # MSE per sample (B,)
     mse = MSE_batch(output, target)
@@ -543,17 +506,6 @@ def compute_batch_metrics(output, target, input_image=None):
 # ============================================================
 
 def combined_loss(output, target, eta_k=None, eta_TV=None, eta_l1=None, model=None):
-    """
-    Compute combined loss for complex images in B C H W format.
-
-    Arguments:
-        output (torch.Tensor): Predicted image, shape B C H W
-        target (torch.Tensor): Target image, shape B C H W
-        eta_k (float, optional): Weight for frequency-domain loss
-        eta_TV (float, optional): Weight for total variation loss
-        eta_l1 (float, optional): Weight for L1 regularization on model parameters
-        model (torch.nn.Module, optional): Model to apply L1 regularization
-    """
     # MSE across all channels (including complex channels)
     total_loss = torch.mean((output - target) ** 2)
 
@@ -591,23 +543,6 @@ def setup_training(
     optimizer_kwargs=None,
     scheduler_kwargs=None,
 ):
-    """
-    Configure optimizer, scheduler, and loss function.
-
-    Args:
-        model (torch.nn.Module): Model containing parameters to optimize.
-        network (torch.nn.Module): Network used inside combined_loss (for L1 regularization).
-        device (torch.device): Device to move model to.
-        lr (float): Learning rate.
-        eta_k (float, optional): Frequency loss weight.
-        eta_TV (float, optional): TV loss weight.
-        eta_l1 (float, optional): L1 regularization weight.
-        optimizer (torch.optim.Optimizer): Optimizer class.
-        scheduler (torch.optim.lr_scheduler._LRScheduler): Scheduler class.
-        optimizer_kwargs (dict, optional): Extra optimizer arguments.
-        scheduler_kwargs (dict, optional): Extra scheduler arguments.
-    """
-
     model.to(device)
 
     if optimizer_kwargs is None:
@@ -648,12 +583,6 @@ def plot_training_state(
     target,
     save_path
 ):
-    """
-    Save training curves and reconstruction preview.
-    Assumes outputs and target are B C H W.
-    If C=2 (complex), magnitude is displayed.
-    """
-
     plt.figure(figsize=(10, 10))
 
     # --- Loss ---
@@ -714,6 +643,29 @@ def plot_training_state(
     plt.savefig(os.path.join(save_path, f"Val_{epoch}.pdf"))
     plt.close()
 
+def show_image(ax, img, title, is_error=False):
+    ax.set_title(title)
+
+    # Conversion tensor → numpy
+    if torch.is_tensor(img):
+        img = img.detach().cpu().numpy()
+
+    # Convert (C,H,W) → (H,W,C)
+    if img.ndim == 3 and img.shape[0] in [1, 3]:
+        img = np.transpose(img, (1, 2, 0))
+
+    # Gestion grayscale
+    if img.ndim == 2 or (img.ndim == 3 and img.shape[-1] == 1):
+        img = img.squeeze()
+        if is_error:
+            ax.imshow(img, cmap="hot")
+        else:
+            ax.imshow(img, cmap="gray", vmin=0, vmax=1)
+    else:
+        ax.imshow(img)
+
+    ax.axis("off")
+
 def validation_and_checkpoint(
     model,
     optimizer,
@@ -726,11 +678,6 @@ def validation_and_checkpoint(
     save_path,
     min_iter=50,
 ):
-    """
-    Handle early stopping, scheduler step, and checkpoint saving.
-    Returns updated best_val_loss and patience.
-    """
-
     # --- Early stopping ---
     if epoch_val_mse < best_val_loss:
         best_val_loss = epoch_val_mse
@@ -768,6 +715,7 @@ def validation_and_checkpoint(
 
 def jacobian_free_backpropagation(
     z_fixed,
+    z_fixed_before,
     mask,
     loss_fn,
     target,
@@ -785,24 +733,32 @@ def jacobian_free_backpropagation(
     lambda_Rtheta,
     gamma,
     eta,
+    theta,
+    accelerated,
     backtracking,
     K_JFB,
 ):
     # 1) Differentiable leaf
     z = z_fixed.detach().requires_grad_(True)
-    z = torch.clamp(z, 0.0, 1.0)  # Ensure z is in [0,1] to avoid numerical issues
+    z_before = z_fixed_before.detach()  # No grad needed for previous iterate
+    
     # 2) Compute loss
     loss = loss_fn(z, target)
 
     # 3) Gradient g = dL/dz
     g = torch.autograd.grad(loss, z, allow_unused=False)[0]
 
+    if accelerated:
+        z_iter = z + (1 - theta) * (z- z_before)
+    else:
+        z_iter = z
+    
     # 4) Single-step evaluation f_theta(z)
     tau0 = lambda_dc if isinstance(lambda_dc, float) else lambda_dc
     if backtracking:
         if DC_type == "prox":
             fz, _ = one_step_PGD_back(
-                            image=z, obs=y, mask=mask, DC=DC, R=Rtheta,
+                            image=z_iter, obs=y, mask=mask, DC=DC, R=Rtheta,
                             nabla_R=nabla_x_network,
                             lambda_dc=tau0, lambda_Rtheta=lambda_Rtheta,
                             gamma=gamma, eta=eta,
@@ -811,7 +767,7 @@ def jacobian_free_backpropagation(
             
         elif DC_type == "grad":
             fz, _ = one_step_GD_back(
-                image=z, obs=y, mask=mask, R=Rtheta,
+                image=z_iter, obs=y, mask=mask, R=Rtheta,
                 nabla_R=nabla_x_network,
                 lambda_dc=tau0, lambda_Rtheta=lambda_Rtheta,
                 gamma=gamma, eta=eta,
@@ -821,7 +777,7 @@ def jacobian_free_backpropagation(
             raise ValueError("Unsupported DC for backtracking")
     else:
         fz, _ = one_step(
-                image=z, obs=y, mask=mask, DC=DC, nabla_R=nabla_x_network, 
+                image=z_iter, obs=y, mask=mask, DC=DC, nabla_R=nabla_x_network, 
                 lambda_dc=tau0, lambda_Rtheta=lambda_Rtheta, 
                 DC_type=DC_type, noise_type=noise_type, sigma=sigma,
                 forward_op=forward_op, adjoint_op=adjoint_op)
@@ -829,8 +785,6 @@ def jacobian_free_backpropagation(
     # 5) Neumann approximation of (I - J_f^T)^{-1} g
     v = g
     acc = g
-    
-    # fz = torch.clamp(fz, 0.0, 1.0)  # Ensure fz is in [0,1] to avoid numerical issues
 
     if K_JFB > 0:
         for _ in range(K_JFB):
@@ -861,26 +815,3 @@ def jacobian_free_backpropagation(
             p.grad = gparam
 
     return loss
-
-def show_image(ax, img, title, is_error=False):
-    ax.set_title(title)
-
-    # Conversion tensor → numpy
-    if torch.is_tensor(img):
-        img = img.detach().cpu().numpy()
-
-    # Convert (C,H,W) → (H,W,C)
-    if img.ndim == 3 and img.shape[0] in [1, 3]:
-        img = np.transpose(img, (1, 2, 0))
-
-    # Gestion grayscale
-    if img.ndim == 2 or (img.ndim == 3 and img.shape[-1] == 1):
-        img = img.squeeze()
-        if is_error:
-            ax.imshow(img, cmap="hot")
-        else:
-            ax.imshow(img, cmap="gray", vmin=0, vmax=1)
-    else:
-        ax.imshow(img)
-
-    ax.axis("off")

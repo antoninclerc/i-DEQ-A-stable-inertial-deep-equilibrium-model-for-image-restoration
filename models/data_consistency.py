@@ -78,4 +78,3 @@ def DC_grad_Rician(image, image_obs, sigma, lambda_dc=1.):
 
 def DC_prox_Rician(image, image_obs, sigma, lambda_dc=1., max_iter=10):
     return fast_irl1(image, image_obs, sigma, lambda_dc, max_iter)
-

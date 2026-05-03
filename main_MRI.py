@@ -410,23 +410,124 @@ test_dataloader = DataLoader(test_dataset, batch_size=20, shuffle=False)
 #     f.write(f"input_SSIM: {input_SSIM}\n")
 #     f.write(f"test_SSIM: {test_SSIM}\n")
 
-lambda_Rtheta = 0.65
-sigma_denoiser = 0.03
+# lambda_Rtheta = 0.65
+# sigma_denoiser = 0.03
+# noise_level = 1./255
+# accelerated = True  # True pour entraînement accéléré, False pour entraînement complet
+# max_iter = 200
+# backtracking = False
+# init_train = False
+# lambda_dc = .5 # lambda_dc dépend de lambda_Rtheta pour éviter des valeurs trop grandes
+# CNNBlock_model = GSDRUNet(in_channels=1, out_channels=1, pretrained='networks/GSDRUNet_grayscale_torch.ckpt')
+# DC_type = 'grad'
+# learn_lambda_dc = False
+# learn_lambda_Rtheta = True
+# learn_theta_interpol = False
+# B_restart = 100
+
+# # -------------------------------------------------------------------------------
+# # Dossier pour sauvegarde et paramètres du modèle
+# # -------------------------------------------------------------------------------
+
+# path_folder = "Unrolling_comparison/MRI/DEQ/prox_acceleration_{}_Rtheta_{:.2f}_lambda_dc_{:.2f}_noise_{:.3f}_sigma_denoiser_{:.2f}_max_iter_{}_accelerated_{}_B_restart_{}_backtracking_{}".format(acceleration, lambda_Rtheta, lambda_dc, noise_level, sigma_denoiser, max_iter, accelerated, B_restart, backtracking)
+# os.makedirs(path_folder, exist_ok=True)
+
+# model = DeepEquilibrium(
+#                 Network=CNNBlock_model, 
+#                 problem="MRI",
+#                 DC_type=DC_type,
+#                 backtracking=backtracking, 
+#                 lambda_dc=lambda_dc, lambda_Rtheta=lambda_Rtheta,
+#                 learn_lambda_dc=learn_lambda_dc, learn_lambda_Rtheta=learn_lambda_Rtheta,
+#                 gamma=0.01, eta=0.5,
+#                 thresh=1e-4, max_iter=max_iter, 
+#                 device=device, path_folder=path_folder, 
+#                 sigma_noise=noise_level,
+#                 sigma_denoiser=sigma_denoiser,
+#                 theta_interpol=0.2,
+#                 restart=True,
+#                 B_restart=B_restart,
+#                 learn_theta_interpol=learn_theta_interpol,
+#                 learn_B_restart=False)
+
+# # -------------------------------------------------------------------------------
+# # Entraînement
+# # -------------------------------------------------------------------------------
+# # pretrained = "Unrolling_comparison/MRI/DEQ/prox_acceleration_8_Rtheta_0.83_lambda_dc_2.00_noise_0.004_sigma_denoiser_0.03_learn_lambda_dc_accelerated_False" + "/best_model.pth"  # mettre à None si pas de modèle pré-entraîné
+# pretrained = None
+# train = True
+# if train:
+#     model.train_model(
+#             train_loader=train_dataloader,
+#             val_loader=val_dataloader,
+#             accelerated=accelerated,
+#             init_train=None,
+#             JFB=True,
+#             K_JFB=0.,
+#             lr=1e-5,
+#             eta_k=None,
+#             eta_TV=None,
+#             eta_l1=None,
+#             optimizer=torch.optim.Adam,
+#             optimizer_kwargs={"betas": (0.9, 0.999)},
+#             scheduler=None,
+#             scheduler_kwargs=None,
+#             max_patience=25,
+#             max_epochs=500,
+#             plot_interval=1,
+#             pretrained_path=pretrained)
+
+# pretrained = path_folder + "/best_model.pth"  # chemin vers le modèle pré-entraîné, si disponible
+# test = True
+# if test:
+#     dict = model.evaluate(test_loader=test_dataloader, n_display=7, accelerated=accelerated, init_train=None, pretrained_path=pretrained, PnP=False)
+
+# test_mse = dict["test_mse"]
+# test_PSNR = dict["test_PSNR"]
+# input_mse = dict["input_mse"]
+# input_PSNR = dict["input_PSNR"]
+# input_SSIM = dict["input_SSIM"]
+# test_SSIM = dict["test_SSIM"]
+# PSNR_per_iter = dict["PSNR_list"]
+
+# with open(os.path.join(path_folder, "results.txt"), "w") as f:
+#     f.write(f"Accelerated: {accelerated}\n")
+#     f.write("backtracking: {}\n".format(backtracking))
+#     f.write(f"DC_type: {DC_type}\n")
+#     f.write(f"lambda_Rtheta: {lambda_Rtheta}\n")
+#     f.write(f"learn_lambda_dc: {learn_lambda_dc}\n")
+#     f.write(f"learn_lambda_Rtheta: {learn_lambda_Rtheta}\n")
+#     f.write(f"learn_theta_interpol: {learn_theta_interpol}\n")
+#     f.write(f"sigma_denoiser: {sigma_denoiser}\n")
+#     f.write(f"B_restart: {B_restart}\n")
+#     f.write(f"lambda_dc: {lambda_dc}\n")
+#     f.write(f"test_mse: {test_mse}\n")
+#     f.write(f"test_PSNR: {test_PSNR}\n")
+#     f.write(f"input_mse: {input_mse}\n")
+#     f.write(f"input_PSNR: {input_PSNR}\n")
+#     f.write(f"input_SSIM: {input_SSIM}\n")
+#     f.write(f"test_SSIM: {test_SSIM}\n")
+
+lambda_Rtheta = 0.1
+sigma_denoiser = 0.0
 noise_level = 1./255
-accelerated = True  # True pour entraînement accéléré, False pour entraînement complet
-max_iter = 200
-backtracking = False
+accelerated = False  # True pour entraînement accéléré, False pour entraînement complet
+max_iter = 500
+backtracking = True
 init_train = False
-lambda_dc = 0.5 # lambda_dc dépend de lambda_Rtheta pour éviter des valeurs trop grandes
+lambda_dc = 2. # lambda_dc dépend de lambda_Rtheta pour éviter des valeurs trop grandes
 CNNBlock_model = GSDRUNet(in_channels=1, out_channels=1, pretrained='networks/GSDRUNet_grayscale_torch.ckpt')
-DC_type = 'grad'
+DC_type = 'prox'
+learn_lambda_dc = False
+learn_lambda_Rtheta = True
+learn_theta_interpol = False
+B_restart = 100
 
 # -------------------------------------------------------------------------------
 # Dossier pour sauvegarde et paramètres du modèle
 # -------------------------------------------------------------------------------
 
-path_folder = "Unrolling_comparison/MRI/DEQ/grad_acceleration_{}_Rtheta_{:.2f}_lambda_dc_{:.2f}_noise_{:.3f}_sigma_denoiser_{:.2f}_learn_lambda_dc".format(acceleration, lambda_Rtheta, lambda_dc, noise_level, sigma_denoiser)
-os.makedirs(path_folder, exist_ok=True)
+path_folder = "Unrolling_comparison/MRI/DEQ/ELDER_Rtheta_0.1_sigma_denoiser_0.00"
 
 model = DeepEquilibrium(
                 Network=CNNBlock_model, 
@@ -434,7 +535,7 @@ model = DeepEquilibrium(
                 DC_type=DC_type,
                 backtracking=backtracking, 
                 lambda_dc=lambda_dc, lambda_Rtheta=lambda_Rtheta,
-                learn_lambda_dc=True, learn_lambda_Rtheta=True,
+                learn_lambda_dc=learn_lambda_dc, learn_lambda_Rtheta=learn_lambda_Rtheta,
                 gamma=0.01, eta=0.5,
                 thresh=1e-4, max_iter=max_iter, 
                 device=device, path_folder=path_folder, 
@@ -442,14 +543,16 @@ model = DeepEquilibrium(
                 sigma_denoiser=sigma_denoiser,
                 theta_interpol=0.2,
                 restart=True,
-                B_restart=100,
-                learn_theta_interpol=False,
+                B_restart=B_restart,
+                learn_theta_interpol=learn_theta_interpol,
                 learn_B_restart=False)
 
 # -------------------------------------------------------------------------------
 # Entraînement
 # -------------------------------------------------------------------------------
-train = True
+# pretrained = "Unrolling_comparison/MRI/DEQ/prox_acceleration_8_Rtheta_0.83_lambda_dc_2.00_noise_0.004_sigma_denoiser_0.03_learn_lambda_dc_accelerated_False" + "/best_model.pth"  # mettre à None si pas de modèle pré-entraîné
+pretrained = None
+train = False
 if train:
     model.train_model(
             train_loader=train_dataloader,
@@ -467,9 +570,9 @@ if train:
             scheduler=None,
             scheduler_kwargs=None,
             max_patience=25,
-            max_epochs=1000,
+            max_epochs=500,
             plot_interval=1,
-            pretrained_path=None)
+            pretrained_path=pretrained)
 
 pretrained = path_folder + "/best_model.pth"  # chemin vers le modèle pré-entraîné, si disponible
 test = True
@@ -482,11 +585,18 @@ input_mse = dict["input_mse"]
 input_PSNR = dict["input_PSNR"]
 input_SSIM = dict["input_SSIM"]
 test_SSIM = dict["test_SSIM"]
+PSNR_per_iter = dict["PSNR_list"]
 
 with open(os.path.join(path_folder, "results.txt"), "w") as f:
+    f.write(f"Accelerated: {accelerated}\n")
+    f.write("backtracking: {}\n".format(backtracking))
     f.write(f"DC_type: {DC_type}\n")
     f.write(f"lambda_Rtheta: {lambda_Rtheta}\n")
+    f.write(f"learn_lambda_dc: {learn_lambda_dc}\n")
+    f.write(f"learn_lambda_Rtheta: {learn_lambda_Rtheta}\n")
+    f.write(f"learn_theta_interpol: {learn_theta_interpol}\n")
     f.write(f"sigma_denoiser: {sigma_denoiser}\n")
+    f.write(f"B_restart: {B_restart}\n")
     f.write(f"lambda_dc: {lambda_dc}\n")
     f.write(f"test_mse: {test_mse}\n")
     f.write(f"test_PSNR: {test_PSNR}\n")

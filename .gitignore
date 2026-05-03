@@ -6,6 +6,8 @@
 **/*.png
 **/*.jpg
 **/*.jpeg
+*.pdf
 **/Unrolling_comparison/
 **/DATA/
 **/*.h5
+**/Figures/

@@ -1,0 +1,5 @@
+Best Lambda: 25.0
+Best Zeta: 0.0
+Best Mean PSNR on Validation: 13.29 dB
+Best Mean SSIM on Validation: 0.2836
+Test results with best parameters:
