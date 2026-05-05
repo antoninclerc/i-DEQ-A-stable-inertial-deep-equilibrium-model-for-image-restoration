@@ -23,22 +23,34 @@ The methods are evaluated on:
 pip install -r requirements.txt
 ```
 
+Datasets are provided at:
+
+- DATA (reduced training and validation set for MRI): <https://drive.google.com/file/d/1LYmLACEJou3TyTq2EEfRE6wPOQgB1-WT/view?usp=share_link>
+- DEQ weights: <https://drive.google.com/file/d/1Sgk_J26LMeSwMJc0fHQvv1qGjsWb7hKv/view?usp=share_link>
+- Denoiser weights: <https://drive.google.com/file/d/1kXpB_9MiTomWg0kDmTayu5qess75KmTP/view?usp=sharing>
+
 # 2. Dataset Structure
 Expected dataset layout:
 
 ```
-DATA/
-|-- MRI/
-|   |-- singlecoil_train/
-|   |-- singlecoil_val/
-|   |-- singlecoil_test/
-|
-|-- BSDS500/
-    |-- train/
-    |-- val/
-    |-- test/
+DEQS/
+├── DATA/
+│   ├── MRI/
+│   │   ├── singlecoil_train/
+│   │   ├── singlecoil_val/
+│   │   └── singlecoil_test/
+│   │
+│   └── BSDS500/
+│       ├── train/
+│       ├── val/
+│       └── test/
+│
+├── DEQ_weights/
+│
+└── networks/
+    ├── GS_DRUNet_SPlus.ckpt
+    └── GSDRUNet_grayscale_torch/
 ```
-
 ---
 
 # 3. Main components
@@ -507,5 +519,6 @@ python main.py \
 ---
 
 # References
+
 [1] J. Zbontar, F. Knoll, A. Sriram, T. Murrell, Z. Huang, M. J. Muckley, A. Defazio, R. Stern, P. Johnson, M. Bruno, et al. fastMRI: An Open Dataset and Benchmarks for Accelerated MRI. arXiv preprint arXiv:1811.08839, 2018.
 [2] P. Arbelaez, M. Maire, C. Fowlkes, and J. Malik. Contour Detection and Hierarchical Image Segmentation. IEEE Transactions on Pattern Analysis and Machine Intelligence, 33(5):898–916, 2011.

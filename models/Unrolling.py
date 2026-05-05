@@ -125,7 +125,6 @@ class Unrolling(nn.Module):
 
         niter = 0
         intermediate_outputs = []
-
         while niter < self.max_iter:
 
             image = self.DC(image, y, mask, self.lambda_dc)    
@@ -268,7 +267,7 @@ class Unrolling(nn.Module):
                 else:
                     outputs, _ = self.forward_Varnet(batch_input, batch_mask)
 
-                # 2) Compute loss
+                # Compute loss
                 self.optimizer.zero_grad()
 
                 # Standard backward on loss
@@ -348,7 +347,6 @@ class Unrolling(nn.Module):
                 time_epoch_end = time.time()
                 time_per_epoch.append(time_epoch_end - time_epoch_start)
 
-                # On ecrit les stats dans un fichier texte
                 with open(os.path.join(self.path, "training_log.txt"), "a") as f:
                     f.write(
                         f"Epoch {epoch}/{max_epochs} | "
@@ -402,7 +400,6 @@ class Unrolling(nn.Module):
         mean_time_per_epoch = np.mean(time_per_epoch) if time_per_epoch else 0
         print(f"Average time per epoch: {mean_time_per_epoch:.2f} seconds")
 
-        # On ecrit les temps dans un fichier texte
         with open(os.path.join(self.path, "training_log.txt"), "a") as f:
             f.write(f"Total training time: {end_time - time_start:.2f} seconds\n")
             f.write(f"Average time per epoch: {mean_time_per_epoch:.2f} seconds\n")
@@ -429,6 +426,7 @@ class Unrolling(nn.Module):
         test_mse, test_PSNR = [], []
         input_mse, input_PSNR = [], []
         test_SSIM, input_SSIM = [], []
+        mean_time_per_batch = []
 
         # buffers
         display_outputs, display_targets, display_inputs = [], [], []
@@ -443,6 +441,7 @@ class Unrolling(nn.Module):
 
         with torch.no_grad():
             for batch_target, batch_input, batch_mask in test_loader:
+                time_reconstruction_start = time.time()
 
                 batch_input = batch_input.to(self.device).float()
 
@@ -458,6 +457,9 @@ class Unrolling(nn.Module):
                 else:
                     outputs, intermediates = self.forward_Varnet(batch_input, batch_mask)
 
+                time_reconstruction_end = time.time()
+                mean_time_per_batch.append(time_reconstruction_end - time_reconstruction_start)
+                
                 # -----------------------------
                 # Metrics
                 # -----------------------------
@@ -602,7 +604,8 @@ class Unrolling(nn.Module):
                     plt.tight_layout()
                     plt.savefig(os.path.join(self.path, f"test_reconstruction_only_{i}.pdf"), dpi=300)
                     plt.close()
-
+        mean_time_per_batch = np.mean(mean_time_per_batch) if mean_time_per_batch else 0
+        
         return {
             "test_mse": test_mse,
             "test_PSNR": test_PSNR,

@@ -29,7 +29,10 @@ class GridSearch:
             return min(0.1, 1 / R)
 
         elif p == "rician":
-            return min(lambda_dc, 1 / (5 * R))
+            if dc == "grad":
+                return 0.03
+            else:
+                return 5e-4
 
         else:
             raise ValueError(p)
@@ -38,7 +41,7 @@ class GridSearch:
         if self.cfg["problem"] == "rician":
             return dict(gamma=0.01, theta=0.01, restart=100, learn_R=False)
         else:
-            return dict(gamma=0.1, theta=0.2, restart=5000, learn_R=True)
+            return dict(gamma=0.1, theta=0.2, restart=5000, learn_R=False)
 
     # =========================================================
     # 2. GRID
@@ -60,11 +63,19 @@ class GridSearch:
 
         in_ch = 1 if self.cfg["problem"] == "MRI" else 3
 
-        net = GSDRUNet(
-            in_channels=in_ch,
-            out_channels=in_ch,
-            pretrained=self.cfg["pretrained"]
-        )
+        if in_ch == 1:
+            net = GSDRUNet(
+                in_channels=in_ch,
+                out_channels=in_ch,
+                pretrained=self.cfg["pretrained"],
+            )
+        else:
+            net = GSDRUNet(
+                in_channels=in_ch,
+                out_channels=in_ch,
+                 pretrained=self.cfg["pretrained"], 
+                 act_mode='s'
+            )
 
         return DeepEquilibrium(
             Network=net,
@@ -126,7 +137,6 @@ class GridSearch:
                 test_loader=self.val_loader,
                 accelerated=self.cfg["accelerated"],
                 init_train=init_params,
-                PnP=self.cfg["PnP"],
             )
 
             self.save(path, metrics)

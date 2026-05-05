@@ -3,10 +3,10 @@ Lambda: 25.0
 Zeta: 0.0
 Diffusion Steps: 20
 t_start: 200
-Noise Level (Image): 12.75
+Noise Level (Image): 25.5
 Degradation: rician
 
-Mean PSNR: 9.6191 dB
+Mean PSNR: 12.5747 dB
 
-Mean SSIM: 0.2037
+Mean SSIM: 0.3201
 

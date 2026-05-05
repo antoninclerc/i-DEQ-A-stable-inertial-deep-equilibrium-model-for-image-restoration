@@ -68,7 +68,7 @@ def plot_metric(
     plt.close()
 
 def plot_psnr_time(data, labels, filename, linestyles, colors, markers):
-    plt.figure(figsize=(6, 5))
+    plt.figure(figsize=(6, 3.5))
 
     for i, (d, label) in enumerate(zip(data, labels)):
         plt.plot(
@@ -76,7 +76,7 @@ def plot_psnr_time(data, labels, filename, linestyles, colors, markers):
             d["psnr"],
             label=label,
             linestyle=linestyles[i],
-            linewidth=2,
+            linewidth=3,
             # color=colors[i],
             # marker=markers[i],
             # markevery=0.1

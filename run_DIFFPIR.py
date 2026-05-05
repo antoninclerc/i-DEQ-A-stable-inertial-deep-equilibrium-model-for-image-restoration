@@ -8,6 +8,8 @@ from itertools import product
 import deepinv as dinv
 from tqdm import tqdm
 import matplotlib.pyplot as plt
+import time
+from networks.DRUnet import GSDRUNet
 
 from utils import add_zero_channel, PSNR, ifft2c, image_2ch_to_magnitude, SSIM, show_image
 from models.data_consistency import DC_prox_MRI, DC_prox_inpainting, DC_prox_Rician
@@ -62,7 +64,7 @@ def find_nearest(array, value):
 def restore(cfg: Config, dataloader):
 
     if cfg.degradation == "mri":
-        model = dinv.models.GSDRUNet(
+        model = GSDRUNet(
             in_channels=1,
             out_channels=1,
             pretrained="networks/GSDRUNet_grayscale_torch.ckpt",
@@ -117,6 +119,7 @@ def restore(cfg: Config, dataloader):
         else:
             x0 = y
 
+        time_start = time.time()
         x = 2 * x0 - 1
         x = x0
         x = torch.clip(
@@ -157,6 +160,9 @@ def restore(cfg: Config, dataloader):
                     )
 
                     x = (x + 1) / 2
+            time_end = time.time()
+            print(f"Restoration took {time_end - time_start:.2f} seconds.")
+
             x_mag = torch.clamp(x, 0, 1)
             if cfg.degradation == "mri":
                 x_mag = image_2ch_to_magnitude(x_mag)
@@ -308,6 +314,7 @@ def main():
             "train_path": "DATA/BSDS500/train",
             "val_path": "DATA/BSDS500/val",
             "test_path": "DATA/BSDS500/test",
+            "sigma": args.noise_level / 255.0,
         }
 
     train_loader, val_loader, test_loader, physics = get_dataloaders(

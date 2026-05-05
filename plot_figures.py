@@ -24,7 +24,7 @@ EXPERIMENTS = [
      "path": "Unrolling_comparison/MRI/DEQ/DEQ_RISP_maxiter_100_plus/"},
     {"name": "i-DEQ (200)", 
      "path": "Unrolling_comparison/MRI/DEQ/DEQ_RISP_maxiter_200_learn_all/"},
-     {"name": "RISP",
+    {"name": "RISP",
      "path": "Unrolling_comparison/MRI/DEQ/RISP_GRAD_B_5000/"},
     #  {"name": "No Plot",
     #  "path": "Unrolling_comparison/MRI/DEQ/DEQ_RISP_maxiter_100_plus_e5/"},
@@ -36,8 +36,12 @@ EXPERIMENTS = [
     #  "path": "Unrolling_comparison/MRI/DEQ/PROX_DEQ_RISP_Rtheta_0.10_lambda_dc_1.00_sigma_denoiser_0.00/"},
     # {"name": "RISP (B=100)",
     #  "path": "Unrolling_comparison/MRI/DEQ/RISP_GRAD_B_100/"},
+    # {"name": "P-RED",
+    #  "path": "Unrolling_comparison/MRI/DEQ/RED_PROX/"},
     # {"name": "P-RISP",
     #  "path": "Unrolling_comparison/MRI/DEQ/RISP_PROX/"},
+    # {"name": "RED",
+    #  "path": "Unrolling_comparison/MRI/DEQ/RED/"},
     # {"name": "ELDER 0",
     #  "path": "Unrolling_comparison/MRI/DEQ/ELDER_Rtheta_0.1_sigma_denoiser_0.00/"}
 ]
@@ -118,9 +122,9 @@ def build_test_loader():
         config={
             "img_size": (320, 320),
             "acceleration": 8,
-            "train_path": "DATA/singlecoil_train",
-            "val_path": "DATA/singlecoil_val",
-            "test_path": "DATA/singlecoil_test",
+            "train_path": "DATA/MRI/singlecoil_train",
+            "val_path": "DATA/MRI/singlecoil_val",
+            "test_path": "DATA/MRI/singlecoil_test",
             "sigma": 1. / 255,
             "device": DEVICE,
         },
@@ -335,12 +339,15 @@ def plot_curves(curves, PSNR=True, energy=True):
     if PSNR:
         plt.figure(figsize=(6, 5))
 
+        PSNR_cible = 28.2
+        plt.axhline(y=PSNR_cible, color='gray', linestyle='--')
+
         for name in curves:
             if "PSNR" in curves[name]:
                 if name == "No Plot":
                     plt.plot(curves[name]["PSNR"], color="green", linestyle="--")
                 else:
-                    plt.plot(curves[name]["PSNR"], label=name)
+                    plt.plot(curves[name]["PSNR"], label=name, linewidth=3)
 
         plt.xlabel("Iteration", fontsize=16, labelpad=-10)
         plt.ylabel("PSNR", fontsize=16, labelpad=-25)
@@ -348,7 +355,7 @@ def plot_curves(curves, PSNR=True, energy=True):
         plt.xticks(fontsize=14)
         plt.yticks(fontsize=14)
         plt.xticks([0, 300], fontsize=14)
-        plt.yticks([24., 28.3], fontsize=14)
+        plt.yticks([24., 28.2], fontsize=14)
 
         plt.xlim(left=0, right=400)
         plt.ylim(bottom=24, top=28.3)
@@ -359,7 +366,7 @@ def plot_curves(curves, PSNR=True, energy=True):
         plt.close()
 
     if energy:
-        plt.figure()
+        plt.figure(figsize=(6, 3.5))
 
         for name in curves:
             if "Energy" in curves[name]:
@@ -379,7 +386,7 @@ def plot_curves(curves, PSNR=True, energy=True):
 
 def plot_psnr_vs_time(curves):
 
-    plt.figure(figsize=(6, 5))
+    plt.figure(figsize=(6, 3.5))
 
     x_cut = 60
 
@@ -397,7 +404,7 @@ def plot_psnr_vs_time(curves):
                 line, = plt.plot(time, psnr, color="green", linestyle=":")
                 color = "green"
             else:
-                line, = plt.plot(time, psnr, label=name, linewidth=2, linestyle=linestyle)
+                line, = plt.plot(time, psnr, label=name, linewidth=3, linestyle=linestyle)
                 color = line.get_color()
 
             # intersection at x = 60
@@ -426,7 +433,7 @@ def plot_psnr_vs_time(curves):
 
 if __name__ == "__main__":
     psnr = True
-    energy = True
+    energy = False
     curves = run_all(PSNR=psnr, energy=energy)
 
     plot_curves(curves, PSNR=psnr, energy=energy)

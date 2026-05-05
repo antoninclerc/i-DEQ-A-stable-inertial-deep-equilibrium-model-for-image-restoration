@@ -3,10 +3,10 @@ Lambda: 3.0
 Zeta: 1.0
 Diffusion Steps: 20
 t_start: 200
-Noise Level (Image): 1
+Noise Level (Image): 5.0
 Degradation: inpainting
 
-Mean PSNR: 32.5848 dB
+Mean PSNR: 29.7671 dB
 
-Mean SSIM: 0.8988
+Mean SSIM: 0.8067
 

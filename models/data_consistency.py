@@ -1,8 +1,5 @@
 import torch
-import matplotlib.pyplot as plt
 from utils import ifft2c, fft2c, grad_data_consistency_gaussian, grad_data_consistency_rician, fast_irl1
-
-# Data consistency for MRI reconstruction
 
 def DC_prox_MRI(image, k0, mask, lambda_dc=1.):
     lambda_dc = 1 / lambda_dc
@@ -33,8 +30,6 @@ def Adjoint_MRI(k0, mask):
     mask_2ch = torch.cat([mask, mask], dim=1)
     Ah_k0 = ifft2c(mask_2ch * k0)
     return Ah_k0
-
-# Data consistency for random inpainting
 
 def DC_prox_inpainting(image, image_obs, mask, lambda_dc=1.):
 

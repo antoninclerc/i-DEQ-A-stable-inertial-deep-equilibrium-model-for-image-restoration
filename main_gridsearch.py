@@ -13,9 +13,9 @@ def build_data_config(problem):
         return {
             "img_size": (320, 320),
             "acceleration": 8,
-            "train_path": "DATA/singlecoil_train",
-            "val_path": "DATA/singlecoil_val",
-            "test_path": "DATA/singlecoil_test",
+            "train_path": "DATA/MRI/singlecoil_train",
+            "val_path": "DATA/MRI/singlecoil_val",
+            "test_path": "DATA/MRI/singlecoil_test",
         }
 
     elif problem == "inpainting":
@@ -49,7 +49,6 @@ def main():
     parser.add_argument("--problem", required=True, choices=["mri", "inpainting", "rician"])
     parser.add_argument("--dc", required=True, choices=["grad", "prox"])
     parser.add_argument("--accelerated", type=str2bool, default=True)
-    parser.add_argument("--PnP", type=str2bool, default=False)
 
     args = parser.parse_args()
 

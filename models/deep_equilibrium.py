@@ -239,7 +239,6 @@ class DeepEquilibrium(nn.Module):
 
             if self.accelerated:
                 condition = lambda: (iter_num < self.max_iter and eps > self.thresh)
-                # condition = lambda: iter_num < self.max_iter
             else:
                 condition = lambda: (iter_num < self.max_iter and eps > self.thresh)
             times = [] 
@@ -480,6 +479,7 @@ class DeepEquilibrium(nn.Module):
         total_params = sum(p.numel() for p in self.parameters() if p.requires_grad)
         print(f"Total trainable parameters: {total_params}")
         timer_start_training = time.time()
+
         # =================================================
         # Training loop
         # =================================================
@@ -776,6 +776,7 @@ class DeepEquilibrium(nn.Module):
                     outputs, intermediates, stats = self.forward(batch_input, batch_mask)
                 time_reconstruct = time.time() - time_reconstruct
                 mean_time.append(time_reconstruct)
+
                 # -----------------------------
                 # Metrics
                 # -----------------------------
@@ -837,35 +838,6 @@ class DeepEquilibrium(nn.Module):
                     display_input_ssim.extend(ssim_input[:n_to_take])
 
                     n_collected += n_to_take
-
-            # ---------------------------------------
-            # Global metrics
-            # ---------------------------------------
-            # def energy(x, y):
-            #     f = 1/2 * torch.sum((self.forward_op(x, batch_mask) - batch_input)**2) 
-            #     r = self.lambda_Rtheta * self.Rtheta(x)
-            #     return f + r
-            
-            # energies = []
-            # for i in range(len(intermediates)):
-            #     interm_i = intermediates[i]
-            #     energy_i = energy(interm_i, batch_input)
-            #     energies.append(float(energy_i.mean().item()))
-
-            # energy_target = energy(batch_target, batch_input)
-            # input_images = self.adjoint_op(batch_input, batch_mask) if self.problem == "MRI" else batch_input
-            # energy_input = energy(torch.clamp(input_images, 0, 1), batch_input)
-            # energy_rec = energy(outputs, batch_input)
-            
-            # plt.figure()
-            # plt.plot(energies)
-            # plt.xlabel("Iteration")
-            # plt.ylabel("Energy")
-            # plt.yscale("log")
-            # plt.title("Energy evolution")
-            # plt.tight_layout()
-            # plt.savefig(os.path.join(self.path, "energy_evolution.pdf"), dpi=300)
-            # plt.close()
 
             test_mse = float(np.mean(test_mse))
             test_PSNR = float(np.mean(test_PSNR))
@@ -935,19 +907,6 @@ class DeepEquilibrium(nn.Module):
                     image = display_outputs[i]
                     target = display_targets[i]
                     input_image = display_inputs[i]
-
-                    if self.problem == "MRI":
-                        target_unsqueezed = target.unsqueeze(0).unsqueeze(0).to(self.device)
-                        image_unsqueezed = image.unsqueeze(0).unsqueeze(0).to(self.device)
-                        input_unsqueezed = input_image.unsqueeze(0).unsqueeze(0).to(self.device)
-                    else:
-                        target_unsqueezed = target.unsqueeze(0).to(self.device)
-                        image_unsqueezed = image.unsqueeze(0).to(self.device)
-                        input_unsqueezed = input_image.unsqueeze(0).to(self.device)
-
-                    Rtheta_target = self.Rtheta(target_unsqueezed).squeeze().cpu().numpy()
-                    Rtheta_recon = self.Rtheta(image_unsqueezed).squeeze().cpu().numpy()
-                    #Rtheta_input = self.Rtheta(input_unsqueezed).squeeze().cpu().numpy()
 
                     error_map = np.abs(image - target)
 
@@ -1040,6 +999,4 @@ class DeepEquilibrium(nn.Module):
             "input_SSIM": input_SSIM,
             "PSNR_list": psnr_curve,
             "mean_time": mean_time,
-            #"Energy_list": energies,
-
         }
