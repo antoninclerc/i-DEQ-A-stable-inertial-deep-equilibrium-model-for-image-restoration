@@ -15,33 +15,6 @@ The methods are evaluated on:
 - Image inpainting (BSDS500) [2]
 - Rician denoising (BSDS500) [2]
 
-@misc{zbontar2018fastMRI,
-    title={{fastMRI}: An Open Dataset and Benchmarks for Accelerated {MRI}},
-    author={Jure Zbontar and Florian Knoll and Anuroop Sriram and Tullie Murrell and Zhengnan Huang and Matthew J. Muckley and Aaron Defazio and Ruben Stern and Patricia Johnson and Mary Bruno and Marc Parente and Krzysztof J. Geras and Joe Katsnelson and Hersh Chandarana and Zizhao Zhang and Michal Drozdzal and Adriana Romero and Michael Rabbat and Pascal Vincent and Nafissa Yakubova and James Pinkerton and Duo Wang and Erich Owens and C. Lawrence Zitnick and Michael P. Recht and Daniel K. Sodickson and Yvonne W. Lui},
-    journal = {ArXiv e-prints},
-    archivePrefix = "arXiv",
-    eprint = {1811.08839},
-    year={2018}
-}
-@Article{amfm_pami2011,
- author = {Arbelaez, Pablo and Maire, Michael and Fowlkes, Charless and Malik, Jitendra},
- title = {Contour Detection and Hierarchical Image Segmentation},
- journal = {IEEE Trans. Pattern Anal. Mach. Intell.},
- issue_date = {May 2011},
- volume = {33},
- number = {5},
- month = may,
- year = {2011},
- issn = {0162-8828},
- pages = {898--916},
- numpages = {19},
- url = {http://dx.doi.org/10.1109/TPAMI.2010.161},
- doi = {10.1109/TPAMI.2010.161},
- acmid = {1963088},
- publisher = {IEEE Computer Society},
- address = {Washington, DC, USA},
- keywords = {Contour detection, image segmentation, computer vision.},
-}
 ---
 
 # 1. Installation
@@ -533,6 +506,6 @@ python main.py \
 ```
 ---
 
-#References
+# References
 [1] J. Zbontar, F. Knoll, A. Sriram, T. Murrell, Z. Huang, M. J. Muckley, A. Defazio, R. Stern, P. Johnson, M. Bruno, et al. fastMRI: An Open Dataset and Benchmarks for Accelerated MRI. arXiv preprint arXiv:1811.08839, 2018.
 [2] P. Arbelaez, M. Maire, C. Fowlkes, and J. Malik. Contour Detection and Hierarchical Image Segmentation. IEEE Transactions on Pattern Analysis and Machine Intelligence, 33(5):898–916, 2011.
