@@ -6,7 +6,7 @@ t_start: 200
 Noise Level (Image): 25.5
 Degradation: rician
 
-Mean PSNR: 12.5747 dB
+Mean PSNR: 13.7970 dB
 
-Mean SSIM: 0.3201
+Mean SSIM: 0.3838
 

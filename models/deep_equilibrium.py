@@ -234,6 +234,9 @@ class DeepEquilibrium(nn.Module):
         else:
             iter_pretraining = 0
             tau0 = torch.tensor(self.lambda_dc, device=self.device) if self.backtracking else self.lambda_dc
+        if self.andersen_acceleration:
+            list_x = []
+            list_r = []
 
         with torch.no_grad():
 
@@ -282,6 +285,47 @@ class DeepEquilibrium(nn.Module):
                         DC_type=self.DC_type, noise_type=self.noise_type, sigma=self.sigma_noise,
                         forward_op=self.forward_op, adjoint_op=self.adjoint_op
                     )
+                
+                if self.andersen_acceleration:
+                    r_k = (x_next - x_curr).detach()
+                    r_k_flat = r_k.view(r_k.size(0), -1).detach()
+                    x_next_flat = x_next.view(x_next.size(0), -1)
+                    list_x.append(x_next_flat.detach())
+                    list_r.append(r_k_flat.detach())
+                    
+                    if len(list_x) > self.m_andersen:
+                        if self.cycle_andersen:
+                            list_x = [x_next_flat.detach()]
+                            list_r = [r_k_flat.detach()]
+                        else:
+                            list_x.pop(0)
+                            list_r.pop(0)
+
+                    if len(list_r) > 1:
+                        R = torch.stack(list_r, dim=1)
+                        b, m, d = R.shape
+                        beta = []
+                        for i in range(b):
+                            Ri = R[i].T
+                            G = Ri.T @ Ri
+                            ones = torch.ones((m, 1), device=R.device)
+
+                            KKT = torch.cat([
+                                torch.cat([G, ones], dim=1),
+                                torch.cat([ones.T, torch.zeros((1, 1), device=R.device)], dim=1)
+                            ], dim=0)
+
+                            rhs = torch.zeros(m + 1, device=R.device)
+                            rhs[-1] = 1.0
+                            try:
+                                sol = torch.linalg.solve(KKT, rhs)
+                                beta.append(sol[:-1])
+                            except RuntimeError:
+                                print("Linear system solve failed in Anderson acceleration, using fallback.")
+                                beta.append(torch.zeros(m, device=R.device))
+                            
+                        beta = torch.stack(beta, dim=0)  # Shape: (B, m_andersen)
+                        x_next = torch.sum(beta.view(b, m, 1) * torch.stack(list_x, dim=0).permute(1, 0, 2), dim=1).view_as(x_next)
 
                 tau0 = tau if self.backtracking else tau0
 
@@ -413,6 +457,9 @@ class DeepEquilibrium(nn.Module):
         train_loader,
         val_loader,
         accelerated=False,
+        andersen_acceleration=False,
+        m_andersen=5,
+        cycle_andersen=False,
         init_train=None,
         JFB=True,
         K_JFB=3,
@@ -465,7 +512,14 @@ class DeepEquilibrium(nn.Module):
         patience = 0
 
         self.accelerated = accelerated
+        self.andersen_acceleration = andersen_acceleration
+        self.m_andersen = m_andersen
+        self.cycle_andersen = cycle_andersen
         self.init_train = init_train
+
+        if self.accelerated and self.andersen_acceleration:
+            print("Use of Andersen and Inertia. Inertia will be desabled")
+            self.accelerated = False  # Disable inertia if Anderson acceleration is enabled, as they can interfere with each other
 
         train_losses, val_losses = [], []
         train_PSNRs, val_PSNRs = [], []
@@ -725,7 +779,16 @@ class DeepEquilibrium(nn.Module):
             "time_total": time_total
         }
     
-    def evaluate(self, test_loader, init_train=None, n_display=1, accelerated=False, PnP=False, pretrained_path=None):
+    def evaluate(self, 
+                 test_loader, 
+                 init_train=None, 
+                 n_display=1, 
+                 accelerated=False,
+                 andersen_acceleration=False, 
+                 m_andersen=5,
+                 cycle_andersen=False,
+                 PnP=False, 
+                 pretrained_path=None):
 
         self.eval()
         self.to(self.device)
@@ -751,6 +814,14 @@ class DeepEquilibrium(nn.Module):
 
         self.accelerated = accelerated
         self.init_train = init_train
+
+        self.andersen_acceleration = andersen_acceleration
+        self.m_andersen = m_andersen
+        self.cycle_andersen = cycle_andersen
+
+        if self.accelerated and self.andersen_acceleration:
+            print("Use of Andersen and Inertia. Inertia will be desabled")
+            self.accelerated = False  # Disable inertia if Anderson acceleration is enabled, as they can interfere with each other
 
         with torch.no_grad():
             for batch_target, batch_input, batch_mask in test_loader:

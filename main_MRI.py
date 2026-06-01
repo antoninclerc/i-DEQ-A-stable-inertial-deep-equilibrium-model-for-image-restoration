@@ -32,15 +32,15 @@ rng = torch.Generator(device=device).manual_seed(seed)
 # ------------------------------------------------------------
 acceleration = 8
 img_size = (320, 320)
-root = "DATA/singlecoil_train"
+root = "DATA/MRI/singlecoil_train"
 dataset = FastMRISliceDataset(root=root, slice_index="middle")
 train_subset = dataset.save_simple_dataset(root + "/fastmri_brain_singlecoil.pt", pad_to_size=img_size)
 
-root = "DATA/singlecoil_val"
+root = "DATA/MRI/singlecoil_val"
 dataset = FastMRISliceDataset(root=root, slice_index="middle")
 val_subset = dataset.save_simple_dataset(root + "/fastmri_brain_singlecoil.pt", pad_to_size=img_size)
 
-root = "DATA/singlecoil_test"
+root = "DATA/MRI/singlecoil_test"
 dataset = FastMRISliceDataset(root=root, slice_index="middle")
 test_subset = dataset.save_simple_dataset(root + "/fastmri_brain_singlecoil.pt", pad_to_size=img_size)
 
@@ -508,17 +508,20 @@ test_dataloader = DataLoader(test_dataset, batch_size=20, shuffle=False)
 #     f.write(f"input_SSIM: {input_SSIM}\n")
 #     f.write(f"test_SSIM: {test_SSIM}\n")
 
-lambda_Rtheta = 0.1
-sigma_denoiser = 0.0
+lambda_Rtheta = 0.83
+sigma_denoiser = 0.03
 noise_level = 1./255
 accelerated = False  # True pour entraînement accéléré, False pour entraînement complet
-max_iter = 500
-backtracking = True
+andersen_acceleration = True
+cycle_andersen = True
+m_andersen = 20
+max_iter = 150
+backtracking = False
 init_train = False
-lambda_dc = 2. # lambda_dc dépend de lambda_Rtheta pour éviter des valeurs trop grandes
+lambda_dc = .1 # lambda_dc dépend de lambda_Rtheta pour éviter des valeurs trop grandes
 CNNBlock_model = GSDRUNet(in_channels=1, out_channels=1, pretrained='networks/GSDRUNet_grayscale_torch.ckpt')
-DC_type = 'prox'
-learn_lambda_dc = False
+DC_type = 'grad'
+learn_lambda_dc = True
 learn_lambda_Rtheta = True
 learn_theta_interpol = False
 B_restart = 100
@@ -527,7 +530,9 @@ B_restart = 100
 # Dossier pour sauvegarde et paramètres du modèle
 # -------------------------------------------------------------------------------
 
-path_folder = "Unrolling_comparison/MRI/DEQ/ELDER_Rtheta_0.1_sigma_denoiser_0.00"
+path_folder = "Unrolling_comparison/MRI/DEQ/Andersen_lambda_Rtheta_{:.2f}_lambda_dc_{:.2f}_noise_{:.3f}_sigma_denoiser_{:.2f}_max_iter_{}_cycle_{}".format(lambda_Rtheta, lambda_dc, noise_level, sigma_denoiser, max_iter, cycle_andersen)
+
+os.makedirs(path_folder, exist_ok=True)
 
 model = DeepEquilibrium(
                 Network=CNNBlock_model, 
@@ -550,14 +555,16 @@ model = DeepEquilibrium(
 # -------------------------------------------------------------------------------
 # Entraînement
 # -------------------------------------------------------------------------------
-# pretrained = "Unrolling_comparison/MRI/DEQ/prox_acceleration_8_Rtheta_0.83_lambda_dc_2.00_noise_0.004_sigma_denoiser_0.03_learn_lambda_dc_accelerated_False" + "/best_model.pth"  # mettre à None si pas de modèle pré-entraîné
 pretrained = None
-train = False
+train = True
 if train:
     model.train_model(
             train_loader=train_dataloader,
             val_loader=val_dataloader,
             accelerated=accelerated,
+            andersen_acceleration=andersen_acceleration,
+            m_andersen=m_andersen,
+            cycle_andersen=cycle_andersen,
             init_train=None,
             JFB=True,
             K_JFB=0.,
@@ -577,7 +584,15 @@ if train:
 pretrained = path_folder + "/best_model.pth"  # chemin vers le modèle pré-entraîné, si disponible
 test = True
 if test:
-    dict = model.evaluate(test_loader=test_dataloader, n_display=7, accelerated=accelerated, init_train=None, pretrained_path=pretrained, PnP=False)
+    dict = model.evaluate(test_loader=test_dataloader, 
+                          n_display=7, 
+                          accelerated=accelerated,
+                          andersen_acceleration=andersen_acceleration,
+                          m_andersen=m_andersen,
+                          cycle_andersen=cycle_andersen,
+                          init_train=None, 
+                          pretrained_path=pretrained, 
+                          PnP=False)
 
 test_mse = dict["test_mse"]
 test_PSNR = dict["test_PSNR"]
@@ -589,6 +604,9 @@ PSNR_per_iter = dict["PSNR_list"]
 
 with open(os.path.join(path_folder, "results.txt"), "w") as f:
     f.write(f"Accelerated: {accelerated}\n")
+    f.write(f"Andersen_acceleration: {andersen_acceleration}\n")
+    f.write(f"Cycle_Andersen: {cycle_andersen}\n")
+    f.write(f"m_Andersen: {m_andersen}\n")
     f.write("backtracking: {}\n".format(backtracking))
     f.write(f"DC_type: {DC_type}\n")
     f.write(f"lambda_Rtheta: {lambda_Rtheta}\n")

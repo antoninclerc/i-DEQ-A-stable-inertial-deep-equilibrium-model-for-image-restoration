@@ -6,7 +6,7 @@ t_start: 200
 Noise Level (Image): 5.0
 Degradation: inpainting
 
-Mean PSNR: 29.7671 dB
+Mean PSNR: 30.1673 dB
 
-Mean SSIM: 0.8067
+Mean SSIM: 0.8234
 
