@@ -136,6 +136,14 @@ Interpolation parameter θ.
 ##### `--learn_theta_interpol` (bool, default=True)
 Whether θ is learned during training.
 
+##### '--andersen_acceleration' (bool, default=False)
+Enables Andersen Acceleration.
+
+#### '--cycle_andersen' (bool, default=False)
+Cycle the number of iterates used for interpolation or use a fixed number.
+
+#### '--m_andersen' (int, default=5)
+Maximum number of iterates for interpolation in Andersen acceleration.
 ---
 
 #### Noise model
@@ -508,7 +516,7 @@ Number of sampled ζ values (uniform grid between min and max).
 ---
 ### Example
 ```bash
-python main.py \
+python run_DIFFPIR.py \
 --problem mri \
 --mode test \
 --lambda_ 10.0 \

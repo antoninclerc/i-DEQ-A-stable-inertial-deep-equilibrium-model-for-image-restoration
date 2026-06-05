@@ -5,7 +5,6 @@ import torch
 import argparse
 import random
 from itertools import product
-import deepinv as dinv
 from tqdm import tqdm
 import matplotlib.pyplot as plt
 import time
@@ -121,7 +120,7 @@ def restore(cfg: Config, dataloader):
 
         time_start = time.time()
         x = 2 * x0 - 1
-        x = x0
+
         x = torch.clip(
             torch.sqrt(alphas[cfg.t_start]) * x
             + torch.sqrt(1 - alphas[cfg.t_start]) * torch.randn_like(x),
@@ -133,7 +132,7 @@ def restore(cfg: Config, dataloader):
             for i in tqdm(range(len(seq))):
                 curr_sigma = sigmas[cfg.t_start - 1 - seq[i]].item()
 
-                x0 = 2 * denoiser((x + 1) / 2, curr_sigma) - 1
+                x0 = denoiser(x, curr_sigma)
 
                 if i != len(seq) - 1:
                     t_i = find_nearest(sigmas.cpu(), curr_sigma)
@@ -220,7 +219,7 @@ def restore(cfg: Config, dataloader):
 # GRID SEARCH
 # =========================================================
 def run_grid_search(args, dataloader):
-    lambdas = np.linspace(args.lambda_min, args.lambda_max, args.n_lambda).tolist()
+    lambdas = np.logspace(np.log10(args.lambda_min), np.log10(args.lambda_max), args.n_lambda).tolist()
     zetas = np.linspace(args.zeta_min, args.zeta_max, args.n_zeta).tolist()
 
     for lambda_, zeta in product(lambdas, zetas):
@@ -246,6 +245,36 @@ def run_test(args, dataloader):
         degradation=args.problem,
     )
     restore(cfg, dataloader)
+
+def find_best_model(args, dataloader):
+    best_psnr = -float('inf')
+    best_lambda = None
+    best_zeta = None
+
+    lambdas = np.logspace(np.log10(args.lambda_min), np.log10(args.lambda_max), args.n_lambda).tolist()
+    zetas = np.linspace(args.zeta_min, args.zeta_max, args.n_zeta).tolist()
+
+    for lambda_, zeta in product(lambdas, zetas):
+        path_folder = 'DIFFPIR/lambda_{}_zeta_{}'.format(lambda_, zeta)
+        psnr_file = os.path.join(path_folder, 'psnr_results.txt')
+
+        if os.path.exists(psnr_file):
+            with open(psnr_file, 'r') as f:
+                lines = f.readlines()
+                for line in lines:
+                    if line.startswith("Mean PSNR:"):
+                        current_psnr = float(line.split(":")[1].strip().split()[0])
+                        if current_psnr > best_psnr:
+                            best_psnr = current_psnr
+                            best_lambda = lambda_
+                            best_zeta = zeta
+                        break
+    
+    print(f"Best PSNR: {best_psnr:.4f} dB with Lambda: {best_lambda} and Zeta: {best_zeta}")
+    with open(os.path.join('DIFFPIR', 'best_model_results.txt'), 'w') as f:
+        f.write(f"Best PSNR: {best_psnr:.4f} dB\n")
+        f.write(f"Best Lambda: {best_lambda}\n")
+        f.write(f"Best Zeta: {best_zeta}\n")
 
 
 # =========================================================
@@ -276,8 +305,8 @@ def main():
     # =====================================================
     # GRID SEARCH PARAMS
     # =====================================================
-    parser.add_argument("--lambda_min", type=float, default=3.0)
-    parser.add_argument("--lambda_max", type=float, default=25.0)
+    parser.add_argument("--lambda_min", type=float, default=0.1)
+    parser.add_argument("--lambda_max", type=float, default=25.)
     parser.add_argument("--n_lambda", type=int, default=10)
 
     parser.add_argument("--zeta_min", type=float, default=0.0)
@@ -326,6 +355,7 @@ def main():
     # =====================================================
     if args.mode == "grid":
         run_grid_search(args, val_loader)
+        find_best_model(args, val_loader)
     else:
         run_test(args, test_loader)
 

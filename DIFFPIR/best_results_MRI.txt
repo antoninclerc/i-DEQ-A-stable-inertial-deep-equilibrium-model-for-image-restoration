@@ -1,4 +1,0 @@
-Best Lambda: 3.0
-Best Zeta: 0.5555555555555556
-Best Mean PSNR on Validation: 25.10 dB
-Test results with best parameters:

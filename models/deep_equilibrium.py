@@ -68,6 +68,8 @@ class DeepEquilibrium(nn.Module):
                  # -----------------------------
                  device='cpu',
                  path_folder=None,
+                 random_noise=False,
+                 noise_bounds=(1e-5, 0.1),
                  sigma_noise=0.0,
                  sigma_denoiser=0.05,
 
@@ -79,6 +81,8 @@ class DeepEquilibrium(nn.Module):
                  B_restart=100,
                  learn_theta_interpol=False,
                  learn_B_restart=False,
+                 m_andersen=5,
+                 cycle_andersen=False,
                  ):
 
         super(DeepEquilibrium, self).__init__()
@@ -116,7 +120,12 @@ class DeepEquilibrium(nn.Module):
         self.eta = eta
         self.thresh = thresh
         self.max_iter = max_iter
+        self.random_noise = random_noise
+        
         self.sigma_noise = sigma_noise
+        self.noise_bounds = noise_bounds
+        if self.random_noise:
+            print('Random noise enabled, sigma_denoiser will be set at the noise value, the value passed in is therefore ignored.')
         self.sigma_denoiser = sigma_denoiser
 
         self.learn_theta_interpol = learn_theta_interpol
@@ -127,6 +136,8 @@ class DeepEquilibrium(nn.Module):
         self.theta = theta_interpol if not learn_theta_interpol else nn.Parameter(torch.tensor(theta_interpol, dtype=torch.float32))
         self.restart = restart
         self.B_restart = B_restart if not learn_B_restart else nn.Parameter(torch.tensor(B_restart, dtype=torch.float32))
+        self.m_andersen = m_andersen
+        self.cycle_andersen = cycle_andersen
 
         # -----------------------------
         # Directory for models
@@ -458,8 +469,6 @@ class DeepEquilibrium(nn.Module):
         val_loader,
         accelerated=False,
         andersen_acceleration=False,
-        m_andersen=5,
-        cycle_andersen=False,
         init_train=None,
         JFB=True,
         K_JFB=3,
@@ -513,8 +522,6 @@ class DeepEquilibrium(nn.Module):
 
         self.accelerated = accelerated
         self.andersen_acceleration = andersen_acceleration
-        self.m_andersen = m_andersen
-        self.cycle_andersen = cycle_andersen
         self.init_train = init_train
 
         if self.accelerated and self.andersen_acceleration:
@@ -533,6 +540,8 @@ class DeepEquilibrium(nn.Module):
         total_params = sum(p.numel() for p in self.parameters() if p.requires_grad)
         print(f"Total trainable parameters: {total_params}")
         timer_start_training = time.time()
+
+        val_noise = None
 
         # =================================================
         # Training loop
@@ -560,6 +569,14 @@ class DeepEquilibrium(nn.Module):
                 B = batch_input.shape[0]
                 
                 if self.noise_type == 'gaussian':
+                    if self.random_noise:
+                        self.sigma_noise = (
+                                self.noise_bounds[0]
+                                + (self.noise_bounds[1] - self.noise_bounds[0])
+                                * torch.rand(B, 1, 1, 1)
+                            ).to(self.device)
+                        self.sigma_denoiser = self.sigma_noise  # Set denoiser noise level to match the noise added to the input
+
                     batch_input = batch_input + self.sigma_noise * torch.randn_like(batch_input)
                     
                 batch_mask = batch_mask["mask"].to(self.device).float()
@@ -596,6 +613,7 @@ class DeepEquilibrium(nn.Module):
                         adjoint_op=self.adjoint_op,
                         noise_type=self.noise_type,
                         sigma=self.sigma_noise,
+                        random_noise=self.random_noise,
                         Rtheta=self.Rtheta,
                         nabla_x_network=self.nabla_x_network,
                         lambda_dc=self.tau0,
@@ -651,8 +669,19 @@ class DeepEquilibrium(nn.Module):
                     batch_input = batch_input.to(self.device).float()
 
                     B = batch_input.shape[0]
+
+                    if val_noise is None and self.random_noise:
+                        val_noise = (
+                                self.noise_bounds[0]
+                                + (self.noise_bounds[1] - self.noise_bounds[0])
+                                * torch.rand(B, 1, 1, 1)
+                            ).to(self.device)
                     
                     if self.noise_type == 'gaussian':
+                        if self.random_noise:
+                            self.sigma_noise = val_noise
+                            self.sigma_denoiser = self.sigma_noise  # Set denoiser noise level to match the noise added to the input
+
                         batch_input = batch_input + self.sigma_noise * torch.randn_like(batch_input)
                     
                     batch_mask = batch_mask["mask"].to(self.device).float()
@@ -784,9 +813,8 @@ class DeepEquilibrium(nn.Module):
                  init_train=None, 
                  n_display=1, 
                  accelerated=False,
-                 andersen_acceleration=False, 
-                 m_andersen=5,
-                 cycle_andersen=False,
+                 andersen_acceleration=False,
+                 noise_test=0.,
                  PnP=False, 
                  pretrained_path=None):
 
@@ -816,8 +844,10 @@ class DeepEquilibrium(nn.Module):
         self.init_train = init_train
 
         self.andersen_acceleration = andersen_acceleration
-        self.m_andersen = m_andersen
-        self.cycle_andersen = cycle_andersen
+
+        if self.random_noise:
+            self.sigma_noise = noise_test
+            self.sigma_denoiser = noise_test
 
         if self.accelerated and self.andersen_acceleration:
             print("Use of Andersen and Inertia. Inertia will be desabled")

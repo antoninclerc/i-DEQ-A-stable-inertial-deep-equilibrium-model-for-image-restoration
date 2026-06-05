@@ -42,6 +42,10 @@ def main():
     parser.add_argument("--theta_interpol", type=float, default=0.2)
     parser.add_argument("--learn_theta_interpol", type=str2bool, default=True)
 
+    parser.add_argument("--andersen_acceleration", type=str2bool, default=False)
+    parser.add_argument("--cycle_andersen", type=str2bool, default=False)
+    parser.add_argument("--m_andersen", type=int, default=5)
+
     # noise
     parser.add_argument("--noise", type=float, default=1/255)
     parser.add_argument("--sigma_denoiser", type=float, default=0.03)
@@ -124,6 +128,8 @@ def main():
         B_restart=args.B_restart,
         theta_interpol=args.theta_interpol,
         learn_theta_interpol=args.learn_theta_interpol,
+        cycle_andersen=args.cycle_andersen,
+        m_andersen=args.m_andersen,
     )
 
     if args.init_train:
@@ -139,6 +145,7 @@ def main():
             train_loader=train_loader,
             val_loader=val_loader,
             accelerated=args.accelerated,
+            andersen_acceleration=args.andersen_acceleration,
             init_train=init_train_params,
             JFB=True,
             K_JFB=0.,
@@ -159,6 +166,7 @@ def main():
     results = model.evaluate(
         test_loader=test_loader,
         accelerated=args.accelerated,
+        andersen_acceleration=args.andersen_acceleration,
         init_train=init_train_params,
         n_display=5,
         pretrained_path=os.path.join(args.save_dir, "best_model.pth")

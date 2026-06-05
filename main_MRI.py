@@ -511,10 +511,10 @@ test_dataloader = DataLoader(test_dataset, batch_size=20, shuffle=False)
 lambda_Rtheta = 0.83
 sigma_denoiser = 0.03
 noise_level = 1./255
-accelerated = False  # True pour entraînement accéléré, False pour entraînement complet
-andersen_acceleration = True
-cycle_andersen = True
-m_andersen = 20
+accelerated = True  # True pour entraînement accéléré, False pour entraînement complet
+andersen_acceleration = False
+cycle_andersen = False
+m_andersen = 5
 max_iter = 150
 backtracking = False
 init_train = False
@@ -524,13 +524,16 @@ DC_type = 'grad'
 learn_lambda_dc = True
 learn_lambda_Rtheta = True
 learn_theta_interpol = False
+theta_interpol = 0.2
 B_restart = 100
+random_noise = True
+noise_level = (1/255, 12.75/255)
 
 # -------------------------------------------------------------------------------
 # Dossier pour sauvegarde et paramètres du modèle
 # -------------------------------------------------------------------------------
 
-path_folder = "Unrolling_comparison/MRI/DEQ/Andersen_lambda_Rtheta_{:.2f}_lambda_dc_{:.2f}_noise_{:.3f}_sigma_denoiser_{:.2f}_max_iter_{}_cycle_{}".format(lambda_Rtheta, lambda_dc, noise_level, sigma_denoiser, max_iter, cycle_andersen)
+path_folder = "Unrolling_comparison/MRI/DEQ/multinoise"
 
 os.makedirs(path_folder, exist_ok=True)
 
@@ -542,15 +545,18 @@ model = DeepEquilibrium(
                 lambda_dc=lambda_dc, lambda_Rtheta=lambda_Rtheta,
                 learn_lambda_dc=learn_lambda_dc, learn_lambda_Rtheta=learn_lambda_Rtheta,
                 gamma=0.01, eta=0.5,
-                thresh=1e-4, max_iter=max_iter, 
-                device=device, path_folder=path_folder, 
+                thresh=1e-5, max_iter=max_iter, 
+                device=device, path_folder=path_folder,
+                random_noise=random_noise,
                 sigma_noise=noise_level,
                 sigma_denoiser=sigma_denoiser,
-                theta_interpol=0.2,
+                theta_interpol=theta_interpol,
                 restart=True,
                 B_restart=B_restart,
                 learn_theta_interpol=learn_theta_interpol,
-                learn_B_restart=False)
+                learn_B_restart=False,
+                m_andersen=m_andersen,
+                cycle_andersen=cycle_andersen,)
 
 # -------------------------------------------------------------------------------
 # Entraînement
@@ -563,8 +569,6 @@ if train:
             val_loader=val_dataloader,
             accelerated=accelerated,
             andersen_acceleration=andersen_acceleration,
-            m_andersen=m_andersen,
-            cycle_andersen=cycle_andersen,
             init_train=None,
             JFB=True,
             K_JFB=0.,
@@ -588,8 +592,7 @@ if test:
                           n_display=7, 
                           accelerated=accelerated,
                           andersen_acceleration=andersen_acceleration,
-                          m_andersen=m_andersen,
-                          cycle_andersen=cycle_andersen,
+                          noise_test=1/255,
                           init_train=None, 
                           pretrained_path=pretrained, 
                           PnP=False)
@@ -604,12 +607,15 @@ PSNR_per_iter = dict["PSNR_list"]
 
 with open(os.path.join(path_folder, "results.txt"), "w") as f:
     f.write(f"Accelerated: {accelerated}\n")
+    f.write(f"Random noise: {random_noise}\n")
+    f.write(f"Noise level: {noise_level}\n")
     f.write(f"Andersen_acceleration: {andersen_acceleration}\n")
     f.write(f"Cycle_Andersen: {cycle_andersen}\n")
     f.write(f"m_Andersen: {m_andersen}\n")
     f.write("backtracking: {}\n".format(backtracking))
     f.write(f"DC_type: {DC_type}\n")
     f.write(f"lambda_Rtheta: {lambda_Rtheta}\n")
+    f.write(f"theta_interpol: {theta_interpol}\n")
     f.write(f"learn_lambda_dc: {learn_lambda_dc}\n")
     f.write(f"learn_lambda_Rtheta: {learn_lambda_Rtheta}\n")
     f.write(f"learn_theta_interpol: {learn_theta_interpol}\n")

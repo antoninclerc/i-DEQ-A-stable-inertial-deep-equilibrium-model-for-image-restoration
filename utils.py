@@ -505,10 +505,13 @@ def compute_batch_metrics(output, target, input_image=None):
 # TRAINING SETUP
 # ============================================================
 
-def combined_loss(output, target, eta_k=None, eta_TV=None, eta_l1=None, model=None):
+def combined_loss(output, target, eta_k=None, eta_TV=None, eta_l1=None, model=None, sigma=None):
     # MSE across all channels (including complex channels)
-    total_loss = torch.mean((output - target) ** 2)
-
+    if sigma is None:
+        total_loss = torch.mean((output - target) ** 2)
+    else:
+        total_loss = torch.mean(((output - target) / sigma) ** 2)
+    
     # Frequency-domain consistency
     if eta_k is not None:
         k_out = fft2c(output)    # output already has real+imag
@@ -551,14 +554,15 @@ def setup_training(
     if scheduler_kwargs is None:
         scheduler_kwargs = {}
 
-    def criterion(output, target, gtheta=None):
+    def criterion(output, target, sigma):
         return combined_loss(
             output,
             target,
             eta_k=eta_k,
             eta_TV=eta_TV,
             eta_l1=eta_l1,
-            model=network
+            model=network,
+            sigma=sigma
         )
 
     optimizer_instance = optimizer(model.parameters(), lr=lr, **optimizer_kwargs)
@@ -727,6 +731,7 @@ def jacobian_free_backpropagation(
     adjoint_op,
     noise_type,
     sigma,
+    random_noise,
     Rtheta,
     nabla_x_network,
     lambda_dc,
@@ -743,7 +748,12 @@ def jacobian_free_backpropagation(
     z_before = z_fixed_before.detach()  # No grad needed for previous iterate
     
     # 2) Compute loss
-    loss = loss_fn(z, target)
+    if random_noise:
+        noise_loss = sigma
+    else:
+        noise_loss = None
+
+    loss = loss_fn(z, target, sigma=noise_loss)
 
     # 3) Gradient g = dL/dz
     g = torch.autograd.grad(loss, z, allow_unused=False)[0]
