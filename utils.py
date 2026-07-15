@@ -1,3 +1,5 @@
+import time
+
 import torch
 import os
 import numpy as np
@@ -505,12 +507,45 @@ def compute_batch_metrics(output, target, input_image=None):
 # TRAINING SETUP
 # ============================================================
 
+def project_simplex(v: torch.Tensor) -> torch.Tensor:
+    """
+    Orthogonal projection onto the probability simplex:
+    {x >= 0, sum(x) = 1}
+
+    Works for 1D or batched tensors.
+    """
+    original_shape = v.shape
+    v = v.reshape(-1, v.shape[-1])  # support batch
+
+    # sort in descending order
+    u, _ = torch.sort(v, dim=1, descending=True)
+
+    cssv = torch.cumsum(u, dim=1)
+
+    # compute rho condition
+    k = torch.arange(1, v.size(1) + 1, device=v.device).unsqueeze(0)
+
+    cond = u - (cssv - 1) / k > 0
+
+    # last true index per row
+    rho = cond.int().cumsum(dim=1).argmax(dim=1)
+
+    # gather theta
+    theta = (cssv[torch.arange(v.size(0)), rho] - 1) / (rho + 1).float()
+
+    x = torch.clamp(v - theta.unsqueeze(1), min=0.0)
+
+    return x.reshape(original_shape)
+
 def combined_loss(output, target, eta_k=None, eta_TV=None, eta_l1=None, model=None, sigma=None):
     # MSE across all channels (including complex channels)
     if sigma is None:
         total_loss = torch.mean((output - target) ** 2)
     else:
-        total_loss = torch.mean(((output - target) / sigma) ** 2)
+        inv_sigma2 = 1.0 / (sigma ** 2)
+        # weight = project_simplex(inv_sigma2)
+        weight = inv_sigma2 / torch.sum(inv_sigma2)
+        total_loss = torch.mean(((output - target))** 2 * weight)
     
     # Frequency-domain consistency
     if eta_k is not None:
@@ -742,6 +777,7 @@ def jacobian_free_backpropagation(
     accelerated,
     backtracking,
     K_JFB,
+    eigenvalue_tracking
 ):
     # 1) Differentiable leaf
     z = z_fixed.detach().requires_grad_(True)
@@ -807,6 +843,60 @@ def jacobian_free_backpropagation(
 
         acc = acc + v
 
+    if eigenvalue_tracking:
+
+        def F(x):
+            return one_step(
+                image=x,
+                obs=y,
+                mask=mask,
+                DC=DC,
+                nabla_R=nabla_x_network,
+                lambda_dc=tau0,
+                lambda_Rtheta=lambda_Rtheta,
+                DC_type=DC_type,
+                noise_type=noise_type,
+                sigma=sigma,
+                forward_op=forward_op,
+                adjoint_op=adjoint_op
+            )[0]
+
+        z_req = z.detach().requires_grad_(True)
+
+        v = torch.randn_like(z_req)
+        v = v / (v.norm() + 1e-12)
+
+        # Power iteration on J^T J
+        for _ in range(10):
+
+            # Jv
+            Jv = torch.autograd.functional.jvp(F, z_req, v)[1]
+
+            # J^T (Jv)
+            JTJv = torch.autograd.grad(
+                F(z_req),
+                z_req,
+                grad_outputs=Jv,
+                retain_graph=True,
+                create_graph=False
+            )[0]
+
+            v = JTJv / (JTJv.norm() + 1e-12)
+
+        # final singular value estimate
+        Jv = torch.autograd.functional.jvp(F, z_req, v)[1]
+        spectral_norm = Jv.norm().item()
+
+        # free memory
+        z_req = None
+        Jv = None
+        v = None
+
+    else:
+        spectral_norm = None
+    
+    print(f"Spectral norm of J_f: {spectral_norm}")
+    
     # 6) Gradients w.r.t parameters
     grads = torch.autograd.grad(
         fz,
@@ -814,7 +904,7 @@ def jacobian_free_backpropagation(
         grad_outputs=acc,
         retain_graph=False,
         allow_unused=False
-    )
+        )
 
     # 7) Assign gradients
     for p, gparam in zip(params, grads):
@@ -824,4 +914,4 @@ def jacobian_free_backpropagation(
         else:
             p.grad = gparam
 
-    return loss
+    return loss, spectral_norm

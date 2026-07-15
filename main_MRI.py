@@ -81,11 +81,11 @@ test_dataloader = DataLoader(test_dataset, batch_size=20, shuffle=False)
 # DC_type = 'grad'
 # lambda_Rthetas = (5*np.logspace(-1, 0, num=10)).tolist() # 10 valeurs de lambda_Rtheta entre 0.1 et 10
 # # lambda_Rthetas = [1.] # PnP
-# accelerateds = [False, True]
+# accelerateds = [True]
 # max_iter = 200
 # backtracking = False
-# sigma_denoising = np.linspace(0.01, 0.05, num=5).tolist()
-# noise_level = 1./255
+# sigma_denoising = np.linspace(0.02, 0.08, num=5).tolist()
+# noise_level = 5./255
 # init_train = False
 
 # for lambda_Rtheta, sigma_denoiser, accelerated in product(lambda_Rthetas, sigma_denoising, accelerateds):
@@ -508,33 +508,32 @@ test_dataloader = DataLoader(test_dataset, batch_size=20, shuffle=False)
 #     f.write(f"input_SSIM: {input_SSIM}\n")
 #     f.write(f"test_SSIM: {test_SSIM}\n")
 
-lambda_Rtheta = 0.83
-sigma_denoiser = 0.03
-noise_level = 1./255
+lambda_Rtheta = 0.65
+sigma_denoiser = 0.04
 accelerated = True  # True pour entraînement accéléré, False pour entraînement complet
 andersen_acceleration = False
 cycle_andersen = False
 m_andersen = 5
-max_iter = 150
+max_iter = 300
 backtracking = False
 init_train = False
-lambda_dc = .1 # lambda_dc dépend de lambda_Rtheta pour éviter des valeurs trop grandes
+lambda_dc = .5 # lambda_dc dépend de lambda_Rtheta pour éviter des valeurs trop grandes
 CNNBlock_model = GSDRUNet(in_channels=1, out_channels=1, pretrained='networks/GSDRUNet_grayscale_torch.ckpt')
 DC_type = 'grad'
-learn_lambda_dc = True
+learn_lambda_dc = False
 learn_lambda_Rtheta = True
 learn_theta_interpol = False
 theta_interpol = 0.2
 B_restart = 100
-random_noise = True
-noise_level = (1/255, 12.75/255)
+random_noise = False
+noise_level = 5./255
+noise_level_bounds = (1/255, 25.5/255) # Lower bound has to be >0 for weighting of the loss reasons
 
 # -------------------------------------------------------------------------------
 # Dossier pour sauvegarde et paramètres du modèle
 # -------------------------------------------------------------------------------
 
-path_folder = "Unrolling_comparison/MRI/DEQ/multinoise"
-
+path_folder = "Unrolling_comparison/MRI/DEQ/tau_decrease_5255"
 os.makedirs(path_folder, exist_ok=True)
 
 model = DeepEquilibrium(
@@ -545,10 +544,11 @@ model = DeepEquilibrium(
                 lambda_dc=lambda_dc, lambda_Rtheta=lambda_Rtheta,
                 learn_lambda_dc=learn_lambda_dc, learn_lambda_Rtheta=learn_lambda_Rtheta,
                 gamma=0.01, eta=0.5,
-                thresh=1e-5, max_iter=max_iter, 
+                thresh=1e-4, max_iter=max_iter, 
                 device=device, path_folder=path_folder,
                 random_noise=random_noise,
                 sigma_noise=noise_level,
+                noise_bounds=noise_level_bounds,
                 sigma_denoiser=sigma_denoiser,
                 theta_interpol=theta_interpol,
                 restart=True,
@@ -562,7 +562,7 @@ model = DeepEquilibrium(
 # Entraînement
 # -------------------------------------------------------------------------------
 pretrained = None
-train = True
+train = False
 if train:
     model.train_model(
             train_loader=train_dataloader,
@@ -583,7 +583,8 @@ if train:
             max_patience=25,
             max_epochs=500,
             plot_interval=1,
-            pretrained_path=pretrained)
+            pretrained_path=pretrained,
+            eigenvalue_tracking=False)
 
 pretrained = path_folder + "/best_model.pth"  # chemin vers le modèle pré-entraîné, si disponible
 test = True
@@ -592,10 +593,19 @@ if test:
                           n_display=7, 
                           accelerated=accelerated,
                           andersen_acceleration=andersen_acceleration,
-                          noise_test=1/255,
+                          noise_test=25.5/255,
                           init_train=None, 
                           pretrained_path=pretrained, 
                           PnP=False)
+
+test_multinoise = False
+if test_multinoise:
+    model.evaluate_multinoise(test_loader=test_dataloader, 
+                 init_train=None, 
+                 accelerated=accelerated,
+                 andersen_acceleration=andersen_acceleration,
+                 pretrained_path=pretrained,
+                 number_noises=10)
 
 test_mse = dict["test_mse"]
 test_PSNR = dict["test_PSNR"]

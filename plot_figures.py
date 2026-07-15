@@ -17,15 +17,15 @@ EXPERIMENTS = [
     # {"name": "DEQ-RISP (100)", 
     #  "path": "Unrolling_comparison/MRI/DEQ/DEQ_RISP_maxiter_100/"},
     {"name": "DEQ (100)",
-     "path": "Unrolling_comparison/MRI/DEQ/ELDER_maxiter_100/"},
+     "path": "Unrolling_comparison/MRI/DEQ/run_paper/ELDER_maxiter_100/"},
     {"name": "DEQ (200)",
-     "path": "Unrolling_comparison/MRI/DEQ/ELDER_maxiter_200/"},
+     "path": "Unrolling_comparison/MRI/DEQ/run_paper/ELDER_maxiter_200/"},
     {"name": "i-DEQ (100)", 
-     "path": "Unrolling_comparison/MRI/DEQ/DEQ_RISP_maxiter_100_plus/"},
+     "path": "Unrolling_comparison/MRI/DEQ/run_paper/DEQ_RISP_maxiter_100_plus/"},
     {"name": "i-DEQ (200)", 
-     "path": "Unrolling_comparison/MRI/DEQ/DEQ_RISP_maxiter_200_learn_all/"},
+     "path": "Unrolling_comparison/MRI/DEQ/run_paper/DEQ_RISP_maxiter_200_learn_all/"},
     {"name": "RISP",
-     "path": "Unrolling_comparison/MRI/DEQ/RISP_GRAD_B_5000/"},
+     "path": "Unrolling_comparison/MRI/DEQ/run_paper/RISP_GRAD_B_5000/"},
     #  {"name": "No Plot",
     #  "path": "Unrolling_comparison/MRI/DEQ/DEQ_RISP_maxiter_100_plus_e5/"},
     # {"name": "DEQ-RISP (200, alpha=0.2)", 
@@ -43,9 +43,13 @@ EXPERIMENTS = [
     # {"name": "RED",
     #  "path": "Unrolling_comparison/MRI/DEQ/RED/"},
     # {"name": "ELDER 0",
-    #  "path": "Unrolling_comparison/MRI/DEQ/ELDER_Rtheta_0.1_sigma_denoiser_0.00/"}
+    #  "path": "Unrolling_comparison/MRI/DEQ/ELDER_Rtheta_0.1_sigma_denoiser_0.00/"},
+    {"name": "theta 0.1",
+     "path": "Unrolling_comparison/MRI/DEQ/theta_01/"},
+    {"name": "andersen",
+     "path": "Unrolling_comparison/MRI/DEQ/Andersen_10_150/"}
 ]
-DEVICE = "cuda:1"
+DEVICE = "cuda:0"
 
 TARGET_ITERS = [50, 100, 150, 200, 500]
 
@@ -100,7 +104,7 @@ def load_config(path_folder):
     def to_bool(x):
         return x.lower() in ["true", "yes", "1"]
 
-    for k in ["lambda_Rtheta", "sigma_denoiser", "lambda_dc", "B_restart"]:
+    for k in ["lambda_Rtheta", "sigma_denoiser", "lambda_dc", "B_restart", "theta_interpol"]:
         if k in cfg:
             cfg[k] = to_float(cfg[k])
 
@@ -164,7 +168,7 @@ def build_model(cfg, path):
         path_folder=path,
         sigma_noise=1. / 255,
         sigma_denoiser=float(cfg["sigma_denoiser"]),
-        theta_interpol=0.2,
+        theta_interpol=float(cfg.get("theta_interpol", 0.2)),
         restart=True,
         B_restart=cfg.get("B_restart", 5000),
         learn_theta_interpol=cfg.get("learn_theta_interpol", False),

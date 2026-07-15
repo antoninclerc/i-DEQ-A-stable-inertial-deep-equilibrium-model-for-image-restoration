@@ -5,7 +5,7 @@ from pathlib import Path
 from PIL import Image
 
 # Force PyTorch to use a single GPU
-os.environ["CUDA_VISIBLE_DEVICES"] = "0"
+os.environ["CUDA_VISIBLE_DEVICES"] = "1"
 device = "cuda:0"
 
 import torch
@@ -398,135 +398,135 @@ test_dataloader = DataLoader(test_dataset, batch_size=20, shuffle=False)
 #     f.write(f"Best model path: {best_model_path}\n")
 #     f.write(f"Best PSNR: {best_PSNR}\n")
 
-lambda_Rtheta = 0.83
-sigma_denoiser = 0.03
-sigma_noise = 1./255
-accelerated = False  # True pour entraînement accéléré, False pour entraînement complet
-max_iter = 300
-backtracking = True
-init_train = True
-lambda_dc = 2.  # lambda_dc dépend de lambda_Rtheta pour éviter des valeurs trop grandes
-CNNBlock_model = GSDRUNet(in_channels=3, out_channels=3, pretrained='./networks/GS_DRUNet_SPlus.ckpt', act_mode='s')
-DC_type = 'prox'
-learn_lambda_dc = False
-learn_lambda_Rtheta = True
-learn_theta_interpol = False
-learn_B_restart = False
-B_restart = 500
+# lambda_Rtheta = 0.83
+# sigma_denoiser = 0.03
+# sigma_noise = 5./255
+# accelerated = False  # True pour entraînement accéléré, False pour entraînement complet
+# max_iter = 300
+# backtracking = True
+# init_train = True
+# lambda_dc = 2.  # lambda_dc dépend de lambda_Rtheta pour éviter des valeurs trop grandes
+# CNNBlock_model = GSDRUNet(in_channels=3, out_channels=3, pretrained='./networks/GS_DRUNet_SPlus.ckpt', act_mode='s')
+# DC_type = 'prox'
+# learn_lambda_dc = False
+# learn_lambda_Rtheta = True
+# learn_theta_interpol = False
+# learn_B_restart = False
+# B_restart = 500
 
-path_folder = "Unrolling_comparison/DEQs/Inpainting/ELDER_less"
-os.makedirs(path_folder, exist_ok=True)
+# path_folder = "Unrolling_comparison/DEQs/Inpainting/ELDER_less"
+# os.makedirs(path_folder, exist_ok=True)
 
-model = DeepEquilibrium(
-                Network=CNNBlock_model, 
-                problem="Inpainting",
-                DC_type=DC_type,
-                backtracking=backtracking,
-                lambda_dc=lambda_dc,
-                lambda_Rtheta=lambda_Rtheta,
-                learn_lambda_dc=learn_lambda_dc,
-                learn_lambda_Rtheta=learn_lambda_Rtheta,
-                gamma=0.1, eta=0.5,
-                thresh=1e-4, max_iter=max_iter, 
-                device=device, path_folder=path_folder, 
-                sigma_noise=sigma_noise,
-                sigma_denoiser=sigma_denoiser,
-                theta_interpol=0.2,
-                restart=True,
-                B_restart=B_restart,
-                learn_theta_interpol=learn_theta_interpol,
-                learn_B_restart=learn_B_restart
-            )
+# model = DeepEquilibrium(
+#                 Network=CNNBlock_model, 
+#                 problem="Inpainting",
+#                 DC_type=DC_type,
+#                 backtracking=backtracking,
+#                 lambda_dc=lambda_dc,
+#                 lambda_Rtheta=lambda_Rtheta,
+#                 learn_lambda_dc=learn_lambda_dc,
+#                 learn_lambda_Rtheta=learn_lambda_Rtheta,
+#                 gamma=0.1, eta=0.5,
+#                 thresh=1e-4, max_iter=max_iter, 
+#                 device=device, path_folder=path_folder, 
+#                 sigma_noise=sigma_noise,
+#                 sigma_denoiser=sigma_denoiser,
+#                 theta_interpol=0.2,
+#                 restart=True,
+#                 B_restart=B_restart,
+#                 learn_theta_interpol=learn_theta_interpol,
+#                 learn_B_restart=learn_B_restart
+#             )
 
-if init_train:
-    init_train_params = {"epoch_pretraining" : 20, "sigma_pretraining" : 0.2, "tau0_pretraining" : 0.1}
-else:
-    init_train_params = None
+# if init_train:
+#     init_train_params = {"epoch_pretraining" : 20, "sigma_pretraining" : 0.2, "tau0_pretraining" : 0.1}
+# else:
+#     init_train_params = None
 
 
-pretrained_path = None
-train = False
-if train:
-    model.train_model(
-        train_loader=train_dataloader,
-        val_loader=val_dataloader,
-        accelerated=accelerated,
-        init_train=init_train_params,
-        JFB=True,
-        K_JFB=0,
-        lr=1e-5,
-        eta_k=None,
-        eta_TV=None,
-        eta_l1=None,
-        optimizer=torch.optim.Adam,
-        optimizer_kwargs={"betas": (0.9, 0.999)},
-        scheduler=None,
-        scheduler_kwargs=None,
-        max_patience=25,
-        max_epochs=500,
-        plot_interval=1,
-        pretrained_path=pretrained_path
-    )
+# pretrained_path = None
+# train = False
+# if train:
+#     model.train_model(
+#         train_loader=train_dataloader,
+#         val_loader=val_dataloader,
+#         accelerated=accelerated,
+#         init_train=init_train_params,
+#         JFB=True,
+#         K_JFB=0,
+#         lr=1e-5,
+#         eta_k=None,
+#         eta_TV=None,
+#         eta_l1=None,
+#         optimizer=torch.optim.Adam,
+#         optimizer_kwargs={"betas": (0.9, 0.999)},
+#         scheduler=None,
+#         scheduler_kwargs=None,
+#         max_patience=25,
+#         max_epochs=500,
+#         plot_interval=1,
+#         pretrained_path=pretrained_path
+#     )
 
-pretrained_path = os.path.join(path_folder, "best_model.pth")
-test = True
-if test:
-    dict = model.evaluate(
-        test_loader=test_dataloader,
-        n_display=7,
-        accelerated=accelerated,
-        init_train=init_train_params,
-        pretrained_path=pretrained_path,
-        PnP=False
-    )
-test_mse = dict["test_mse"]
-test_PSNR = dict["test_PSNR"]
-input_mse = dict["input_mse"]
-input_PSNR = dict["input_PSNR"]
-input_SSIM = dict["input_SSIM"]
-test_SSIM = dict["test_SSIM"]
-PSNR_per_iter = dict["PSNR_list"]
+# pretrained_path = os.path.join(path_folder, "best_model.pth")
+# test = True
+# if test:
+#     dict = model.evaluate(
+#         test_loader=test_dataloader,
+#         n_display=7,
+#         accelerated=accelerated,
+#         init_train=init_train_params,
+#         pretrained_path=pretrained_path,
+#         PnP=False
+#     )
+# test_mse = dict["test_mse"]
+# test_PSNR = dict["test_PSNR"]
+# input_mse = dict["input_mse"]
+# input_PSNR = dict["input_PSNR"]
+# input_SSIM = dict["input_SSIM"]
+# test_SSIM = dict["test_SSIM"]
+# PSNR_per_iter = dict["PSNR_list"]
 
-with open(os.path.join(path_folder, "results.txt"), "w") as f:
-    f.write(f"Accelerated: {accelerated}\n")
-    f.write("backtracking: {}\n".format(backtracking))
-    f.write(f"DC_type: {DC_type}\n")
-    f.write(f"lambda_Rtheta: {lambda_Rtheta}\n")
-    f.write(f"learn_lambda_dc: {learn_lambda_dc}\n")
-    f.write(f"learn_lambda_Rtheta: {learn_lambda_Rtheta}\n")
-    f.write(f"learn_theta_interpol: {learn_theta_interpol}\n")
-    f.write(f"sigma_denoiser: {sigma_denoiser}\n")
-    f.write(f"B_restart: {B_restart}\n")
-    f.write(f"lambda_dc: {lambda_dc}\n")
-    f.write(f"test_mse: {test_mse}\n")
-    f.write(f"test_PSNR: {test_PSNR}\n")
-    f.write(f"input_mse: {input_mse}\n")
-    f.write(f"input_PSNR: {input_PSNR}\n")
-    f.write(f"input_SSIM: {input_SSIM}\n")
-    f.write(f"test_SSIM: {test_SSIM}\n")
+# with open(os.path.join(path_folder, "results.txt"), "w") as f:
+#     f.write(f"Accelerated: {accelerated}\n")
+#     f.write("backtracking: {}\n".format(backtracking))
+#     f.write(f"DC_type: {DC_type}\n")
+#     f.write(f"lambda_Rtheta: {lambda_Rtheta}\n")
+#     f.write(f"learn_lambda_dc: {learn_lambda_dc}\n")
+#     f.write(f"learn_lambda_Rtheta: {learn_lambda_Rtheta}\n")
+#     f.write(f"learn_theta_interpol: {learn_theta_interpol}\n")
+#     f.write(f"sigma_denoiser: {sigma_denoiser}\n")
+#     f.write(f"B_restart: {B_restart}\n")
+#     f.write(f"lambda_dc: {lambda_dc}\n")
+#     f.write(f"test_mse: {test_mse}\n")
+#     f.write(f"test_PSNR: {test_PSNR}\n")
+#     f.write(f"input_mse: {input_mse}\n")
+#     f.write(f"input_PSNR: {input_PSNR}\n")
+#     f.write(f"input_SSIM: {input_SSIM}\n")
+#     f.write(f"test_SSIM: {test_SSIM}\n")
 
 lambda_Rtheta = 0.83
 sigma_denoiser = 0.03
 sigma_noise = 5./255
-accelerated = False  # True pour entraînement accéléré, False pour entraînement complet
-max_iter = 150
-backtracking = True
+accelerated = True  # True pour entraînement accéléré, False pour entraînement complet
+max_iter = 200
+backtracking = False
 init_train = True
-lambda_dc = 2.  # lambda_dc dépend de lambda_Rtheta pour éviter des valeurs trop grandes
+lambda_dc = .1  # lambda_dc dépend de lambda_Rtheta pour éviter des valeurs trop grandes
 CNNBlock_model = GSDRUNet(in_channels=3, out_channels=3, pretrained='./networks/GS_DRUNet_SPlus.ckpt', act_mode='s')
-DC_type = 'prox'
+DC_type = 'grad'
 learn_lambda_dc = False
 learn_lambda_Rtheta = True
 learn_theta_interpol = False
 learn_B_restart = False
 B_restart = 500
 
-path_folder = "Unrolling_comparison/DEQs/Inpainting/ELDER"
+path_folder = "Unrolling_comparison/DEQs/Inpainting/tau_decrease_lr_5e-6"
 os.makedirs(path_folder, exist_ok=True)
 
 model = DeepEquilibrium(
                 Network=CNNBlock_model, 
-                problem="Inpainting",
+                problem="inpainting",
                 DC_type=DC_type,
                 backtracking=backtracking,
                 lambda_dc=lambda_dc,
@@ -561,7 +561,7 @@ if train:
         init_train=init_train_params,
         JFB=True,
         K_JFB=0,
-        lr=1e-5,
+        lr=5e-6,
         eta_k=None,
         eta_TV=None,
         eta_l1=None,
@@ -575,7 +575,7 @@ if train:
         pretrained_path=pretrained_path
     )
 
-#pretrained_path = os.path.join(path_folder, "best_model.pth")
+pretrained_path = os.path.join(path_folder, "best_model.pth")
 test = True
 if test:
     dict = model.evaluate(

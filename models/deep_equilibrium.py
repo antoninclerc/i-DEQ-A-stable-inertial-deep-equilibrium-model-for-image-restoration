@@ -8,6 +8,7 @@ import time
 from models.data_consistency import (
     DC_prox_MRI, DC_grad_MRI, Adjoint_MRI, Forward_MRI, 
     DC_prox_inpainting, DC_grad_inpainting, Forward_inpainting, Adjoint_inpainting,
+    DC_prox_deblurring, DC_grad_deblurring, Forward_deblurring, Adjoint_deblurring,
     DC_prox_Rician, DC_grad_Rician, Forward_Rician, Adjoint_Rician)
 
 from utils import (
@@ -155,28 +156,37 @@ class DeepEquilibrium(nn.Module):
                 self.DC = DC_prox_MRI
             elif self.DC_type == "grad":
                 self.DC = DC_grad_MRI
-            self.Adjoint = Adjoint_MRI
             self.forward_op = Forward_MRI
             self.adjoint_op = Adjoint_MRI
             self.noise_type = 'gaussian'
+            self.mask = 'mask'
         elif self.problem == "inpainting":
             if self.DC_type == "prox":
                 self.DC = DC_prox_inpainting
             elif self.DC_type == "grad":
                 self.DC = DC_grad_inpainting
-            self.Adjoint = Adjoint_inpainting
             self.forward_op = Forward_inpainting
             self.adjoint_op = Adjoint_inpainting
             self.noise_type = 'gaussian'
+            self.mask = 'mask'
+        elif self.problem == "deblurring":
+            if self.DC_type == "prox":
+                self.DC = DC_prox_deblurring
+            elif self.DC_type == "grad":
+                self.DC = DC_grad_deblurring
+            self.forward_op = Forward_deblurring
+            self.adjoint_op = Adjoint_deblurring
+            self.noise_type = 'gaussian'
+            self.mask = 'filter'
         elif self.problem == "rician":
             if self.DC_type == "prox":
                 self.DC = DC_prox_Rician
             elif self.DC_type == "grad":
                 self.DC = DC_grad_Rician
-            self.Adjoint = Adjoint_Rician
             self.forward_op = Forward_Rician
             self.adjoint_op = Adjoint_Rician
             self.noise_type = 'rician'
+            self.mask = 'mask'
         else:
             raise ValueError("Unsupported problem type")
 
@@ -211,10 +221,10 @@ class DeepEquilibrium(nn.Module):
         y = y.clone()
 
         # Initial reconstruction
-        if self.problem == "MRI" or self.problem == "rician":
-            x_curr = self.Adjoint(y, mask) # Start from zero-filled reconstruction for MRI and Rician
+        if (self.problem == "MRI" or self.problem == "rician") or self.problem == "deblurring":
+            x_curr = self.adjoint_op(y, mask) # Start from zero-filled reconstruction for MRI and Rician
         elif self.problem == "inpainting":
-            x_curr = self.Adjoint(y, mask)  + (1 - mask) * 0.5  # Start from a constant image (could also start from zero-filled)
+            x_curr = self.adjoint_op(y, mask)  + (1 - mask) * 0.5  # Start from a constant image (could also start from zero-filled)
 
         x_curr = torch.clamp(x_curr, 0, 1.0)  # Ensure initial image is in valid range
         x_prev = x_curr.detach()
@@ -248,6 +258,10 @@ class DeepEquilibrium(nn.Module):
         if self.andersen_acceleration:
             list_x = []
             list_r = []
+
+        patience_eps = 0
+        norm_diff = float('inf')
+        norm_diff_prev = float('inf')
 
         with torch.no_grad():
 
@@ -345,8 +359,24 @@ class DeepEquilibrium(nn.Module):
                 x_curr = x_next.detach()
 
                 # --- convergence ---
-                eps = torch.norm(x_curr - x_prev) / (torch.norm(x_curr))
-                epsilons.append(eps.item())
+                norm_diff = torch.norm(x_curr - x_prev).item()
+                norm_x_curr = torch.norm(x_curr).item()
+                norm_x_prev = torch.norm(x_prev).item()
+                norm_x_norm_x_prev = torch.norm(x_curr - x_prev).item()
+
+                eps = norm_diff / torch.norm(x_prev).item()
+
+                epsilons.append(eps)
+
+                if norm_diff >= norm_diff_prev or norm_x_norm_x_prev < 1e-4:
+                    patience_eps += 1
+
+                norm_diff_prev = norm_diff
+
+                if patience_eps >= 15:
+                    print(f"Warning: eps has increased for {patience_eps} consecutive iterations. Possible divergence.")
+                    tau0 = tau0 * 0.5
+                    patience_eps = 0
 
                 # --- restart (only accelerated) ---
                 if self.accelerated and self.B_restart > 0:
@@ -367,6 +397,9 @@ class DeepEquilibrium(nn.Module):
                         print(f"Pretraining complete. Resuming with backtracking={self.backtracking} and sigma_denoiser={self.sigma_denoiser}.")
                         tau0 = torch.tensor(self.lambda_dc, device=self.device) if self.backtracking else self.lambda_dc
                         print(f"Reset tau0 after pretraining.")
+                
+                if self.init_train is not None and total_iter <= iter_pretraining:
+                    patience_eps = 0
 
                 if total_iter > 2000:
                     raise ValueError("Exceeded maximum allowed iterations, possible divergence.")
@@ -375,17 +408,17 @@ class DeepEquilibrium(nn.Module):
 
                 print(
                     f"Iteration {iter_num} - {total_iter}, "
-                    f"norm diff: {torch.norm(x_curr - x_prev).item():.3f}, "
+                    f"norm diff: {norm_diff:.3f}, "
                     f"norm input image: {torch.norm(image0).item():.3f}, "
-                    f"norm old image: {torch.norm(x_prev).item():.3f}, "
-                    f"norm new image: {torch.norm(x_curr).item():.3f}, "
+                    f"norm old image: {norm_x_prev:.3f}, "
+                    f"norm new image: {norm_x_curr:.3f}, "
                     f"tau: {taux_real_iter[-1] if taux_real_iter else 'N/A'}, "
-                    f"eps: {eps.item() if eps is not None else 'N/A'}"
+                    f"eps: {eps if eps is not None else 'N/A'}"
                 )
 
-                if eps.item() > 5:
+                if eps > 5:
                     raise ValueError(
-                        f"Divergence detected at iteration {iter_num} with eps={eps.item()}"
+                        f"Divergence detected at iteration {iter_num} with eps={eps:.3f}. Consider reducing the step size or checking the model stability."
                     )
                 time_end_iter = time.time()
                 times.append(time_end_iter - time_start_iter)
@@ -394,7 +427,7 @@ class DeepEquilibrium(nn.Module):
             "epsilons": epsilons,
             "times": times
         }
-        self.tau0 = tau0 if self.backtracking else self.lambda_dc
+        self.tau0 = tau0
 
         outputs = x_curr
         return outputs, intermediate_outputs, stats
@@ -402,9 +435,9 @@ class DeepEquilibrium(nn.Module):
     def forward_PnP(self, y, mask):
 
         if self.problem == "MRI" or self.problem == "rician":
-            image = self.Adjoint(y, mask) 
+            image = self.adjoint_op(y, mask) 
         elif self.problem == "inpainting":
-            image = self.Adjoint(y, mask)  + (1 - mask) * 0.5  # Start from a constant image (could also start from zero-filled)
+            image = self.adjoint_op(y, mask)  + (1 - mask) * 0.5  # Start from a constant image (could also start from zero-filled)
 
         image = torch.clamp(image, 0, 1.0)  # Ensure initial image is in valid range
         niter = 0
@@ -471,6 +504,7 @@ class DeepEquilibrium(nn.Module):
         andersen_acceleration=False,
         init_train=None,
         JFB=True,
+        eigenvalue_tracking=False,
         K_JFB=3,
         lr=1e-3,
         eta_k=None,
@@ -542,7 +576,8 @@ class DeepEquilibrium(nn.Module):
         timer_start_training = time.time()
 
         val_noise = None
-
+        if eigenvalue_tracking:
+            max_eigenvalues = []
         # =================================================
         # Training loop
         # =================================================
@@ -575,11 +610,11 @@ class DeepEquilibrium(nn.Module):
                                 + (self.noise_bounds[1] - self.noise_bounds[0])
                                 * torch.rand(B, 1, 1, 1)
                             ).to(self.device)
-                        self.sigma_denoiser = self.sigma_noise  # Set denoiser noise level to match the noise added to the input
+                        self.sigma_denoiser = self.sigma_noise # Set denoiser noise level to match the noise added to the input
 
                     batch_input = batch_input + self.sigma_noise * torch.randn_like(batch_input)
                     
-                batch_mask = batch_mask["mask"].to(self.device).float()
+                batch_mask = batch_mask[self.mask].to(self.device).float()
                 if self.problem == "MRI":
                     batch_input = batch_input * batch_mask  # For MRI, ensure input is consistent with mask
                 else:
@@ -599,7 +634,7 @@ class DeepEquilibrium(nn.Module):
 
                 if JFB:
                     # JFB uses fixed-point z_fixed and single-step one_step internally
-                    jacobian_free_backpropagation(
+                    _, max_eigenvalue = jacobian_free_backpropagation(
                         z_fixed=outputs,
                         z_fixed_before=intermediates[-2] if len(intermediates) > 1 else outputs,  # Use previous intermediate as z_fixed_before for acceleration
                         mask=batch_mask,
@@ -624,8 +659,20 @@ class DeepEquilibrium(nn.Module):
                         accelerated=self.accelerated,
                         backtracking=self.backtracking,
                         K_JFB=self.K_JFB,
+                        eigenvalue_tracking=eigenvalue_tracking
                     )
+                    if eigenvalue_tracking:
+                        max_eigenvalues.append(max_eigenvalue)
 
+                        plt.figure()
+                        plt.plot(max_eigenvalues, label='Max Eigenvalue of Jacobian')
+                        plt.xlabel('Epochs')
+                        plt.ylabel('Max Eigenvalue')
+                        plt.title('Max Eigenvalue of Jacobian')
+                        plt.legend()
+                        plt.tight_layout()
+                        plt.savefig(os.path.join(self.path, f'max_eigenvalue.pdf'))
+                        plt.close()
                 else:
                     # Standard backward on loss
                     loss = self.criterion(outputs, batch_target)
@@ -680,11 +727,11 @@ class DeepEquilibrium(nn.Module):
                     if self.noise_type == 'gaussian':
                         if self.random_noise:
                             self.sigma_noise = val_noise
-                            self.sigma_denoiser = self.sigma_noise  # Set denoiser noise level to match the noise added to the input
+                            self.sigma_denoiser = self.sigma_noise + 0.02  # Set denoiser noise level to match the noise added to the input
 
                         batch_input = batch_input + self.sigma_noise * torch.randn_like(batch_input)
                     
-                    batch_mask = batch_mask["mask"].to(self.device).float()
+                    batch_mask = batch_mask[self.mask].to(self.device).float()
                     if self.problem == "MRI":
                         batch_input = batch_input * batch_mask  # For MRI, ensure input is consistent with mask
                     else:
@@ -739,7 +786,6 @@ class DeepEquilibrium(nn.Module):
                         self.path,
                     )
                 
-                if plot_interval is not None and epoch % plot_interval == 0:
                     plt.figure()
                     plt.plot(iter_nums, label='Train Iterations')
                     plt.plot(iter_nums_val, label='Val Iterations')
@@ -830,6 +876,8 @@ class DeepEquilibrium(nn.Module):
 
         # buffers
         display_outputs, display_targets, display_inputs = [], [], []
+        if self.problem == "deblurring":
+            display_filters = []
         display_psnr, display_input_psnr = [], []
         display_ssim, display_input_ssim = [], []
         mean_time = []
@@ -863,7 +911,7 @@ class DeepEquilibrium(nn.Module):
                 if self.noise_type == 'gaussian':
                     batch_input = batch_input + self.sigma_noise * torch.randn_like(batch_input)
                     
-                batch_mask = batch_mask["mask"].to(self.device).float()
+                batch_mask = batch_mask[self.mask].to(self.device).float()
                 if self.problem == "MRI":
                     batch_input = batch_input * batch_mask  # For MRI, ensure input is consistent with mask
                 else:
@@ -932,6 +980,8 @@ class DeepEquilibrium(nn.Module):
                     display_outputs.append(outputs[:n_to_take].detach().cpu())
                     display_targets.append(batch_target[:n_to_take].detach().cpu())
                     display_inputs.append(batch_input[:n_to_take].detach().cpu())
+                    if self.problem == "deblurring":
+                        display_filters.append(batch_mask[:n_to_take].detach().cpu())
 
                     display_psnr.extend(psnr_list[:n_to_take])
                     display_input_psnr.extend(psnr_input[:n_to_take])
@@ -993,6 +1043,9 @@ class DeepEquilibrium(nn.Module):
                 display_outputs = torch.cat(display_outputs, dim=0)
                 display_targets = torch.cat(display_targets, dim=0)
                 display_inputs = torch.cat(display_inputs, dim=0)
+                
+                if self.problem == "deblurring":
+                    display_filters = torch.cat(display_filters, dim=0)
 
                 if self.problem == "MRI":
                     display_outputs = image_2ch_to_magnitude(display_outputs)
@@ -1008,6 +1061,10 @@ class DeepEquilibrium(nn.Module):
                     image = display_outputs[i]
                     target = display_targets[i]
                     input_image = display_inputs[i]
+
+                    if self.problem == "deblurring":
+                        kernel = display_filters[i]
+                        kernel = (kernel - kernel.min()) / (kernel.max() - kernel.min())  # Normalize for display
 
                     error_map = np.abs(image - target)
 
@@ -1087,9 +1144,24 @@ class DeepEquilibrium(nn.Module):
                     plt.savefig(os.path.join(self.path, f"test_input_image_only_{i}.pdf"), dpi=300)
                     plt.close()
 
+                    if self.problem == "deblurring":
+                        # Plot kernel
+                        plt.figure(figsize=(5,5))
+                        ax = plt.subplot(1,1,1)
+                        show_image(
+                            ax,
+                            kernel,
+                            "Blur kernel"
+                        )
+                        plt.tight_layout()
+                        plt.savefig(os.path.join(self.path, f"test_blur_kernel_{i}.pdf"), dpi=300)
+                        plt.close()
+                        
+
         times = stats["times"] if "times" in stats else None
         with open(os.path.join(self.path, "test_times.txt"), "w") as f:
             f.write(f"Time per iteration: {times}\n")
+
 
         return {
             "test_mse": test_mse,
@@ -1100,4 +1172,115 @@ class DeepEquilibrium(nn.Module):
             "input_SSIM": input_SSIM,
             "PSNR_list": psnr_curve,
             "mean_time": mean_time,
+        }
+    
+    def evaluate_multinoise(self, 
+                 test_loader, 
+                 init_train=None, 
+                 accelerated=False,
+                 andersen_acceleration=False,
+                 pretrained_path=None,
+                 number_noises=5):
+
+        self.eval()
+        self.to(self.device)
+
+        if pretrained_path is not None:
+            load_pretrained(model=self, checkpoint_path=pretrained_path, device=self.device)
+
+        self.accelerated = accelerated
+        self.init_train = init_train
+
+        self.andersen_acceleration = andersen_acceleration
+
+        if self.accelerated and self.andersen_acceleration:
+            print("Use of Andersen and Inertia. Inertia will be desabled")
+            self.accelerated = False  # Disable inertia if Anderson acceleration is enabled, as they can interfere with each other
+
+        range_noises = np.linspace(self.noise_bounds[0], self.noise_bounds[1], num=number_noises)  # Example: 5 noise levels
+
+        PSNR_per_noise_input = {}
+        PSNR_per_noise_output = {}
+
+        with torch.no_grad():
+            for noise_level in range_noises:
+                self.sigma_noise = noise_level
+                self.sigma_denoiser = noise_level
+
+                test_mse, test_PSNR = [], []
+                input_mse, input_PSNR = [], []
+                test_SSIM, input_SSIM = [], []
+
+                print(f"Evaluating for noise level: {noise_level:.4f}")
+            
+                for batch_target, batch_input, batch_mask in test_loader:
+                    time_reconstruct = time.time()
+                    batch_input = batch_input.to(self.device).float()
+
+                    if self.noise_type == 'gaussian':
+                        batch_input = batch_input + self.sigma_noise * torch.randn_like(batch_input)
+                        
+                    batch_mask = batch_mask[self.mask].to(self.device).float()
+                    if self.problem == "MRI":
+                        batch_input = batch_input * batch_mask  # For MRI, ensure input is consistent with mask
+                    else:
+                        batch_input = torch.clamp(batch_input, 0, 1.0)  # Ensure input is in valid range
+                    batch_target = batch_target.to(self.device).float()              
+
+                    outputs, intermediates, stats = self.forward(batch_input, batch_mask)
+                    time_reconstruct = time.time() - time_reconstruct
+
+                    # -----------------------------
+                    # Metrics
+                    # -----------------------------
+                    if self.problem == "MRI":
+                        batch_input_in = ifft2c(batch_input)
+                    else:
+                        batch_input_in = batch_input
+                    mse_list, psnr_list, ssim_list, _ = compute_batch_metrics(outputs, batch_target)
+                    mse_input, psnr_input, ssim_input, _ = compute_batch_metrics(batch_input_in, batch_target)
+
+                    test_mse.extend(mse_list)
+                    test_PSNR.extend(psnr_list)
+                    test_SSIM.extend(ssim_list)
+
+                    input_mse.extend(mse_input)
+                    input_PSNR.extend(psnr_input)
+                    input_SSIM.extend(ssim_input)
+
+                test_mse = float(np.mean(test_mse))
+                test_PSNR = float(np.mean(test_PSNR))
+                test_SSIM = float(np.mean(test_SSIM))
+
+                input_mse = float(np.mean(input_mse))
+                input_PSNR = float(np.mean(input_PSNR))
+                input_SSIM = float(np.mean(input_SSIM))
+
+                PSNR_per_noise_input[noise_level] = input_PSNR
+                PSNR_per_noise_output[noise_level] = test_PSNR
+
+                print("Noise level evaluation complete at noise level {:.4f}.".format(self.sigma_noise))
+                print(f"Test MSE: {test_mse:.6f}, Test PSNR: {test_PSNR:.2f} dB")
+                print(f"Input MSE: {input_mse:.6f}, Input PSNR: {input_PSNR:.2f} dB")
+                print(f"Test SSIM: {test_SSIM:.4f}, Input SSIM: {input_SSIM:.4f}")
+
+        # Plot PSNR vs noise level
+        plt.figure()
+        plt.subplot(1, 2, 1)
+        plt.plot(list(PSNR_per_noise_input.keys()), list(PSNR_per_noise_input.values()), label='Input PSNR')
+        plt.plot(list(PSNR_per_noise_output.keys()), list(PSNR_per_noise_output.values()), label='Output PSNR')
+        plt.xlabel("Noise Level")
+        plt.ylabel("PSNR (dB)")
+        plt.legend()
+        plt.subplot(1, 2, 2)
+        plt.plot(list(PSNR_per_noise_input.keys()), [a - b for a, b in zip(PSNR_per_noise_output.values(), PSNR_per_noise_input.values())])
+        plt.xlabel("Noise Level")
+        plt.ylabel("PSNR gain (dB)")
+        plt.tight_layout()
+        plt.savefig(os.path.join(self.path, "psnr_vs_noise_level.pdf"), dpi=300)
+        plt.close()
+
+        return {
+            "PSNR_per_noise_input": PSNR_per_noise_input,
+            "PSNR_per_noise_output": PSNR_per_noise_output,
         }

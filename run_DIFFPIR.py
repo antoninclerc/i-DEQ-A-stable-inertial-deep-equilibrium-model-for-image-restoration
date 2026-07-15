@@ -131,7 +131,6 @@ def restore(cfg: Config, dataloader):
         with torch.no_grad():
             for i in tqdm(range(len(seq))):
                 curr_sigma = sigmas[cfg.t_start - 1 - seq[i]].item()
-
                 x0 = denoiser(x, curr_sigma)
 
                 if i != len(seq) - 1:

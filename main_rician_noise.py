@@ -5,7 +5,7 @@ from pathlib import Path
 from PIL import Image
 
 # Force PyTorch to use a single GPU
-os.environ["CUDA_VISIBLE_DEVICES"] = "1"
+os.environ["CUDA_VISIBLE_DEVICES"] = "0"
 device = "cuda:0"
 
 import torch
@@ -35,7 +35,7 @@ rng = torch.Generator(device=device).manual_seed(seed)
 # Dataset parameters
 # ---------------------------
 img_size = (3, 320, 320)
-sigma_noise = 0.05
+sigma_noise = 0.1  # Noise level for Rician noise
 
 transform = transforms.ToTensor()
 
@@ -459,19 +459,19 @@ test_dataloader = DataLoader(test_dataset, batch_size=20, shuffle=False)
 lambda_Rtheta = 10.
 sigma_denoiser = 0.02
 accelerated = True  # True pour entraînement accéléré, False pour entraînement complet
-max_iter = 500
+max_iter = 200
 backtracking = False
 init_train = False
 lambda_dc = 0.03  # lambda_dc dépend de lambda_Rtheta pour éviter des valeurs trop grandes
 CNNBlock_model = GSDRUNet(in_channels=3, out_channels=3, pretrained='./networks/GS_DRUNet_SPlus.ckpt', act_mode='s')
 DC_type = 'grad'
-learn_lambda_dc = True
+learn_lambda_dc = False
 learn_lambda_Rtheta = True
-learn_theta_interpol = True
+learn_theta_interpol = False
 learn_B_restart = False
 B_restart = 100
 
-path_folder = "Unrolling_comparison/DEQs/Rician/RISP_less"
+path_folder = "Unrolling_comparison/DEQs/Rician/RISP_taudeacrease_01_lr5e-6"
 os.makedirs(path_folder, exist_ok=True)
 
 model = DeepEquilibrium(
@@ -502,7 +502,7 @@ else:
 
 
 pretrained_path = None
-train = False
+train = True
 if train:
     model.train_model(
         train_loader=train_dataloader,
@@ -511,7 +511,7 @@ if train:
         init_train=init_train_params,
         JFB=True,
         K_JFB=0,
-        lr=1e-5,
+        lr=5e-6,
         eta_k=None,
         eta_TV=None,
         eta_l1=None,
