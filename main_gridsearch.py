@@ -27,9 +27,17 @@ def build_data_config(problem):
             "test_path": "DATA/BSDS500/test",
         }
 
+    elif problem == "deblurring":
+            return {
+                "img_size": (3, 320, 320),
+                "kernel_size": 21,
+                "train_path": "DATA/BSDS500/train",
+                "val_path": "DATA/BSDS500/val",
+                "test_path": "DATA/BSDS500/test",
+            }
+
     elif problem == "rician":
         return {
-            "sigma": 0.1,
             "train_path": "DATA/BSDS500/train",
             "val_path": "DATA/BSDS500/val",
             "test_path": "DATA/BSDS500/test",
@@ -46,9 +54,10 @@ def main():
 
     parser = argparse.ArgumentParser()
 
-    parser.add_argument("--problem", required=True, choices=["mri", "inpainting", "rician"])
+    parser.add_argument("--problem", required=True, choices=["mri", "inpainting", "deblurring", "rician"])
     parser.add_argument("--dc", required=True, choices=["grad", "prox"])
     parser.add_argument("--accelerated", type=str2bool, default=True)
+    parser.add_argument("--noise_level", type=float, default=1.0, help="Noise level, divided by 255 later on")
 
     args = parser.parse_args()
 
@@ -58,13 +67,14 @@ def main():
     problem = normalize_problem(args.problem)
     DC_type = args.dc
     accelerated = args.accelerated
+    noise_level = args.noise_level
 
     print(f"Running: {problem} | {DC_type} | accelerated={accelerated}")
 
     # -------------------------
     # Config grid
     # -------------------------
-    grid_config = build_config(problem, DC_type, accelerated)
+    grid_config = build_config(problem, DC_type, accelerated, noise_level)
 
     # -------------------------
     # Config data

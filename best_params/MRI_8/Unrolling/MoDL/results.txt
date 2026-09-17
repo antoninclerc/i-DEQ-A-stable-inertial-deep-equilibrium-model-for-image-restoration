@@ -1,6 +1,0 @@
-Test MSE: 0.001980
-Test PSNR: 27.52 dB
-Input MSE: 0.004527
-Input PSNR: 23.91 dB
-Input SSIM: 0.4885
-Test SSIM: 0.6157

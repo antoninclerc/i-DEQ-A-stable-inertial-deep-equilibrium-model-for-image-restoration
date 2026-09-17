@@ -35,6 +35,8 @@ def normalize_problem(p):
         return "inpainting"
     if p == "rician":
         return "rician"
+    if p == "deblurring":
+        return "deblurring"
     raise ValueError(p)
 
 # ============================================================
@@ -171,7 +173,7 @@ def fast_irl1(z, y, sigma, lambda_dc, max_iter=10):
     f = y
     v = z
     irl1_input = z
-    lambda_dc = lambda_dc.view(-1,1,1,1)  # Ensure lambda_dc is broadcastable
+    lambda_dc = lambda_dc.view(-1,1,1,1) if isinstance(lambda_dc, torch.Tensor) else lambda_dc  # Ensure lambda_dc is broadcastable
     f_sigma2 = f / (sigma ** 2)
     lamb_f_sigma2 = lambda_dc * f_sigma2
     lamb_sigma2_beta = lambda_dc / (sigma ** 2) + 1
@@ -753,6 +755,7 @@ def validation_and_checkpoint(
     return best_val_loss, patience
 
 def jacobian_free_backpropagation(
+    problem,
     z_fixed,
     z_fixed_before,
     mask,
@@ -788,8 +791,12 @@ def jacobian_free_backpropagation(
         noise_loss = sigma
     else:
         noise_loss = None
+    if problem == "deblurring" and DC_type == "prox":
+        z_loss = torch.roll(z, shifts=(-1, -1), dims=(-2, -1))
+    else:
+        z_loss = z
 
-    loss = loss_fn(z, target, sigma=noise_loss)
+    loss = loss_fn(z_loss, target, sigma=noise_loss)
 
     # 3) Gradient g = dL/dz
     g = torch.autograd.grad(loss, z, allow_unused=False)[0]

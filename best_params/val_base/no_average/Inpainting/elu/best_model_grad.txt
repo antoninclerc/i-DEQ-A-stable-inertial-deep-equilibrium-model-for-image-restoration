@@ -1,2 +1,0 @@
-Best model path: Unrolling_comparison/inpainting/DC_grad_lambda_Rtheta_5.994842503189409_sigma_denoiser_0.030000000000000006_n_iter_init_20
-Best PSNR: 28.222023662103815

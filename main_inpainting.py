@@ -5,7 +5,7 @@ from pathlib import Path
 from PIL import Image
 
 # Force PyTorch to use a single GPU
-os.environ["CUDA_VISIBLE_DEVICES"] = "1"
+os.environ["CUDA_VISIBLE_DEVICES"] = "0"
 device = "cuda:0"
 
 import torch
@@ -275,17 +275,17 @@ test_dataloader = DataLoader(test_dataset, batch_size=20, shuffle=False)
 # backtracking = False
 # sigma_denoising = np.linspace(0.01, 0.05, num=5).tolist()
 # n_iter_init = [20]
-# noise_level = 5/255
+# noise_level = 1./255
 
 
 # for lambda_Rtheta, sigma_denoiser, n_iter in product(lambda_Rthetas, sigma_denoising, n_iter_init):
 
-#     lambda_dc = min(0.1, 1/lambda_Rtheta)
+#     lambda_dc = min(.5, .5/lambda_Rtheta)
 #     # ------------------------------------------------------------------------------
 #     # Dossier pour sauvegarde et paramètres du modèle
 #     # ------------------------------------------------------------------------------
 
-#     path_folder = 'Unrolling_comparison/inpainting/' + f'DC_{DC_type}_lambda_Rtheta_{lambda_Rtheta}_sigma_denoiser_{sigma_denoiser}_n_iter_init_{n_iter}'
+#     path_folder = 'Unrolling_comparison/inpainting/noise_level_' + f'{noise_level}/' + f'DC_{DC_type}_lambda_Rtheta_{lambda_Rtheta}_sigma_denoiser_{sigma_denoiser}_n_iter_init_{n_iter}'
 
 #     os.makedirs(path_folder, exist_ok=True)
 
@@ -299,7 +299,7 @@ test_dataloader = DataLoader(test_dataset, batch_size=20, shuffle=False)
 
 #     model = DeepEquilibrium(
 #         Network=CNNBlock_model,
-#         problem="Inpainting",
+#         problem="inpainting",
 #         DC_type=DC_type,
 #         backtracking=backtracking,
 #         lambda_dc=lambda_dc,
@@ -382,7 +382,7 @@ test_dataloader = DataLoader(test_dataset, batch_size=20, shuffle=False)
 # best_PSNR = -float('inf')
 # best_model_path = None
 # for lambda_Rtheta, sigma_denoiser, n_iter in product(lambda_Rthetas, sigma_denoising, n_iter_init):
-#     path_folder = 'Unrolling_comparison/inpainting/' + f'DC_{DC_type}_lambda_Rtheta_{lambda_Rtheta}_sigma_denoiser_{sigma_denoiser}_n_iter_init_{n_iter}'
+#     path_folder = 'Unrolling_comparison/inpainting/noise_level_' + f'{noise_level}/' + f'DC_{DC_type}_lambda_Rtheta_{lambda_Rtheta}_sigma_denoiser_{sigma_denoiser}_n_iter_init_{n_iter}'
 #     with open(os.path.join(path_folder, "results.txt"), "r") as f:
 #         lines = f.readlines()
 #         for line in lines:
@@ -394,7 +394,7 @@ test_dataloader = DataLoader(test_dataset, batch_size=20, shuffle=False)
 #                     best_model_path = path_folder
 
 # # On écrit le meilleur modèle dans un fichier texte
-# with open("Unrolling_comparison/inpainting/best_model_prox.txt", "w") as f:
+# with open("Unrolling_comparison/inpainting/noise_level_" + f'{noise_level}/' + "best_model_prox.txt", "w") as f:
 #     f.write(f"Best model path: {best_model_path}\n")
 #     f.write(f"Best PSNR: {best_PSNR}\n")
 
@@ -506,22 +506,22 @@ test_dataloader = DataLoader(test_dataset, batch_size=20, shuffle=False)
 #     f.write(f"test_SSIM: {test_SSIM}\n")
 
 lambda_Rtheta = 0.83
-sigma_denoiser = 0.03
-sigma_noise = 5./255
+sigma_denoiser = 0.02
+sigma_noise = 1./255
 accelerated = True  # True pour entraînement accéléré, False pour entraînement complet
 max_iter = 200
 backtracking = False
 init_train = True
-lambda_dc = .1  # lambda_dc dépend de lambda_Rtheta pour éviter des valeurs trop grandes
+lambda_dc = .5  # lambda_dc dépend de lambda_Rtheta pour éviter des valeurs trop grandes
 CNNBlock_model = GSDRUNet(in_channels=3, out_channels=3, pretrained='./networks/GS_DRUNet_SPlus.ckpt', act_mode='s')
-DC_type = 'grad'
+DC_type = 'prox'
 learn_lambda_dc = False
 learn_lambda_Rtheta = True
 learn_theta_interpol = False
 learn_B_restart = False
 B_restart = 500
 
-path_folder = "Unrolling_comparison/DEQs/Inpainting/tau_decrease_lr_5e-6"
+path_folder = "Unrolling_comparison/DEQs/Inpainting/prox_1"
 os.makedirs(path_folder, exist_ok=True)
 
 model = DeepEquilibrium(
@@ -546,13 +546,13 @@ model = DeepEquilibrium(
             )
 
 if init_train:
-    init_train_params = {"epoch_pretraining" : 20, "sigma_pretraining" : 0.2, "tau0_pretraining" : 0.1}
+    init_train_params = {"epoch_pretraining" : 20, "sigma_pretraining" : 0.2, "tau0_pretraining" : 0.5}
 else:
     init_train_params = None
 
 
 pretrained_path = None
-train = True
+train = False
 if train:
     model.train_model(
         train_loader=train_dataloader,
@@ -569,7 +569,7 @@ if train:
         optimizer_kwargs={"betas": (0.9, 0.999)},
         scheduler=None,
         scheduler_kwargs=None,
-        max_patience=25,
+        max_patience=50,
         max_epochs=500,
         plot_interval=1,
         pretrained_path=pretrained_path

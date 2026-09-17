@@ -17,7 +17,7 @@ def main():
     parser = argparse.ArgumentParser()
 
     # problem setup
-    parser.add_argument("--problem", required=True, choices=["mri", "inpainting", "rician"])
+    parser.add_argument("--problem", required=True, choices=["mri", "inpainting", "deblurring", "rician"])
     parser.add_argument("--dc", required=True, choices=["grad", "prox"])
     parser.add_argument("--train", type=str2bool, default=True)
 

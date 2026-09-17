@@ -21,9 +21,11 @@ EXPERIMENTS = [
     {"name": "DEQ (200)",
      "path": "Unrolling_comparison/MRI/DEQ/run_paper/ELDER_maxiter_200/"},
     {"name": "i-DEQ (100)", 
-     "path": "Unrolling_comparison/MRI/DEQ/run_paper/DEQ_RISP_maxiter_100_plus/"},
+     "path": "Unrolling_comparison/MRI/DEQ/run_paper/DEQ_RISP_maxiter_100_plus_B50/"},
     {"name": "i-DEQ (200)", 
      "path": "Unrolling_comparison/MRI/DEQ/run_paper/DEQ_RISP_maxiter_200_learn_all/"},
+    {"name": "i-DEQ-P (100)", 
+     "path": "Unrolling_comparison/MRI/DEQ/iDEQ_P_100/"},
     {"name": "RISP",
      "path": "Unrolling_comparison/MRI/DEQ/run_paper/RISP_GRAD_B_5000/"},
     #  {"name": "No Plot",
@@ -44,10 +46,10 @@ EXPERIMENTS = [
     #  "path": "Unrolling_comparison/MRI/DEQ/RED/"},
     # {"name": "ELDER 0",
     #  "path": "Unrolling_comparison/MRI/DEQ/ELDER_Rtheta_0.1_sigma_denoiser_0.00/"},
-    {"name": "theta 0.1",
-     "path": "Unrolling_comparison/MRI/DEQ/theta_01/"},
-    {"name": "andersen",
-     "path": "Unrolling_comparison/MRI/DEQ/Andersen_10_150/"}
+    # {"name": "theta 0.1",
+    #  "path": "Unrolling_comparison/MRI/DEQ/theta_01/"},
+    # {"name": "andersen",
+    #  "path": "Unrolling_comparison/MRI/DEQ/Andersen_10_150/"}
 ]
 DEVICE = "cuda:0"
 
@@ -362,7 +364,7 @@ def plot_curves(curves, PSNR=True, energy=True):
         plt.yticks([24., 28.2], fontsize=14)
 
         plt.xlim(left=0, right=400)
-        plt.ylim(bottom=24, top=28.3)
+        plt.ylim(bottom=24, top=28.35)
         
         # plt.grid(True)
         plt.tight_layout()
@@ -403,7 +405,7 @@ def plot_psnr_vs_time(curves):
             psnr = psnr[:T]
             time = time[:T]
 
-            linestyle = "--" if name == "DEQ (100)" or name == "DEQ (200)" else "-"
+            linestyle = "--" if name == "DEQ (100)" or name == "DEQ (200)" else "-" if name == "i-DEQ (100)" or name == "i-DEQ (200)" else "-."
             if name == "No Plot":
                 line, = plt.plot(time, psnr, color="green", linestyle=":")
                 color = "green"
@@ -423,9 +425,9 @@ def plot_psnr_vs_time(curves):
     plt.legend(fontsize=14)
 
     plt.xlim(left=0, right=400)
-    plt.ylim(bottom=24, top=28.3)
+    plt.ylim(bottom=24, top=28.35)
     plt.xticks([0, 60, 300], fontsize=14)
-    plt.yticks([24., 28.3], fontsize=14)
+    plt.yticks([24., 28.2], fontsize=14)
 
     plt.tight_layout()
     plt.savefig("Figures/psnr_vs_time_inference.pdf", dpi=300)

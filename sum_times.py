@@ -25,6 +25,6 @@ def sum_iteration_times(file_path: str) -> float:
 
 
 if __name__ == "__main__":
-    file_path = "Unrolling_comparison/MRI/DEQ/RISP_PROX/test_times.txt"  # change this to your file
+    file_path = "Unrolling_comparison/DEQs/Rician/prox_01/test_times.txt"  # change this to your file
     total_time = sum_iteration_times(file_path)
     print("Total time:", total_time)

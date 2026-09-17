@@ -6,6 +6,7 @@ from utils import (
     grad_data_consistency_gaussian, 
     grad_data_consistency_rician, 
     fast_irl1)
+
 import utils_deblur as deblur
 # ----------------------------
 # Data consistency for MRI
@@ -133,27 +134,43 @@ def DC_grad_deblurring(x, y, kernel, lambda_dc=1.0):
 def DC_prox_deblurring(image, image_obs, kernel, lambda_dc=1.0):
     H_img, W_img = image.shape[-2:]
 
-    # Pad kernel to image size
+    # 1. Ajuster les dimensions du kernel (4D)
+    if kernel.ndim == 2:
+        kernel = kernel.unsqueeze(0).unsqueeze(0)
+    elif kernel.ndim == 3:
+        kernel = kernel.unsqueeze(0)
+
+    _, _, kh, kw = kernel.shape
+
+    # 2. Créer kernel_pad
     kernel_pad = torch.zeros(
-        (H_img, W_img),
+        (*kernel.shape[:-2], H_img, W_img),
         dtype=image.dtype,
         device=image.device,
     )
 
-    kh, kw = kernel.shape
-    kernel_pad[:kh, :kw] = kernel
+    # 3. Placer le noyau AU CENTRE de la grille de padding
+    start_h = (H_img - kh) // 2
+    start_w = (W_img - kw) // 2
+    kernel_pad[..., start_h : start_h + kh, start_w : start_w + kw] = kernel
 
-    # Center kernel
-    kernel_pad = torch.fft.ifftshift(kernel_pad)
+    # 4. Amener le centre du noyau au coin (0, 0) pour la FFT
+    kernel_pad = torch.fft.ifftshift(kernel_pad, dim=(-2, -1))
 
-    H_fft = torch.fft.fft2(kernel_pad)
-    V_fft = torch.fft.fft2(image)
-    Y_fft = torch.fft.fft2(image_obs)
+    # S'assurer que lambda_dc est un Tensor 4D [B, 1, 1, 1]
+    if isinstance(lambda_dc, torch.Tensor):
+        while lambda_dc.ndim < image.ndim:
+            lambda_dc = lambda_dc.unsqueeze(-1)
 
-    X_fft = (
-        V_fft + lambda_dc * torch.conj(H_fft) * Y_fft
-    ) / (
-        1.0 + lambda_dc * torch.abs(H_fft) ** 2
-    )
+    # 5. Calculs FFT
+    H_fft = torch.fft.fft2(kernel_pad, dim=(-2, -1))
+    V_fft = torch.fft.fft2(image, dim=(-2, -1))
+    Y_fft = torch.fft.fft2(image_obs, dim=(-2, -1))
+    # 6. Proximal Operator
+    numerator = V_fft + lambda_dc * torch.conj(H_fft) * Y_fft
+    denominator = 1.0 + lambda_dc * (torch.abs(H_fft) ** 2)
 
-    return torch.fft.ifft2(X_fft).real
+    X_fft = numerator / denominator
+
+    X_ifft = torch.fft.ifft2(X_fft, dim=(-2, -1)).real
+    return X_ifft

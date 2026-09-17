@@ -23,6 +23,6 @@ def extract_first_n(archive_path, output_dir, n):
 train_archive = "Fast_MRI_data/knee_singlecoil_train.tar.xz"
 val_archive = "Fast_MRI_data/knee_singlecoil_val.tar.xz"
 
-extract_first_n(train_archive, "DATA/singlecoil_train", 100)
+extract_first_n(train_archive, "DATA/singlecoil_train", 500)
 extract_first_n(val_archive, "DATA/singlecoil_val", 10)
-extract_first_n(val_archive, "DATA/singlecoil_test", 20)
+extract_first_n(val_archive, "DATA/singlecoil_test", 50)

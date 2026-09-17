@@ -1,2 +1,0 @@
-Best model path: Unrolling_comparison/MRI/PnP/acceleration_4/grad_sigma_0.08_init_train_True
-Best PSNR: 27.53375620441189

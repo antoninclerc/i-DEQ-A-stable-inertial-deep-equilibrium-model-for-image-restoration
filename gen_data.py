@@ -159,6 +159,50 @@ def get_dataloaders(problem_type, config):
         val_dataset = dinv.datasets.HDF5Dataset(dataset_path, split="val", load_physics_generator_params=True)
         test_dataset = dinv.datasets.HDF5Dataset(dataset_path, split="test", load_physics_generator_params=True)
 
+    elif problem_type == "deblurring":
+        transform = transforms.ToTensor()
+        img_size = config["img_size"]
+
+        train_tensor = load_folder_as_tensor(config["train_path"], transform)
+        val_tensor = load_folder_as_tensor(config["val_path"], transform)
+        test_tensor = load_folder_as_tensor(config["test_path"], transform)
+
+        train_subset = TensorDataset(train_tensor, train_tensor)
+        val_subset = TensorDataset(val_tensor, val_tensor)
+        test_subset = TensorDataset(test_tensor, test_tensor)
+
+        physics_generator = dinv.physics.generator.MotionBlurGenerator(
+            (config["kernel_size"], config["kernel_size"]),
+            device=device,
+            rng=rng,
+            dtype=torch.float32,
+            sigma=1.,
+            l=0.5
+        )
+
+        physics = dinv.physics.BlurFFT(
+            img_size=img_size,
+            filter=physics_generator.step()["filter"],
+            device=device,
+        )
+
+        dataset_path = dinv.datasets.generate_dataset(
+            train_dataset=train_subset,
+            test_dataset=test_subset,
+            val_dataset=val_subset,
+            physics=physics,
+            physics_generator=physics_generator,
+            save_physics_generator_params=True,
+            overwrite_existing=True,
+            device=device,
+            save_dir=f"datasets/blur",
+            batch_size=4,
+        )
+
+        train_dataset = dinv.datasets.HDF5Dataset(dataset_path, split="train", load_physics_generator_params=True)
+        val_dataset = dinv.datasets.HDF5Dataset(dataset_path, split="val", load_physics_generator_params=True)
+        test_dataset = dinv.datasets.HDF5Dataset(dataset_path, split="test", load_physics_generator_params=True)
+
     # -------------------------
     # Rician
     # -------------------------
@@ -169,9 +213,9 @@ def get_dataloaders(problem_type, config):
         val_tensor = load_folder_as_tensor(config["val_path"], transform)
         test_tensor = load_folder_as_tensor(config["test_path"], transform)
 
-        train_dataset = RicianDataset(train_tensor, config["sigma"])
-        val_dataset = RicianDataset(val_tensor, config["sigma"])
-        test_dataset = RicianDataset(test_tensor, config["sigma"])
+        train_dataset = RicianDataset(train_tensor, config["sigma_noise"])
+        val_dataset = RicianDataset(val_tensor, config["sigma_noise"])
+        test_dataset = RicianDataset(test_tensor, config["sigma_noise"])
 
         physics = None  # Important: pas de physics deepinv ici
 

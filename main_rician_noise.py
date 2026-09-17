@@ -5,7 +5,7 @@ from pathlib import Path
 from PIL import Image
 
 # Force PyTorch to use a single GPU
-os.environ["CUDA_VISIBLE_DEVICES"] = "0"
+os.environ["CUDA_VISIBLE_DEVICES"] = "1"
 device = "cuda:0"
 
 import torch
@@ -105,7 +105,7 @@ test_dataloader = DataLoader(test_dataset, batch_size=20, shuffle=False)
 # # Paramètres (facilement modifiables)
 # # ------------------------------------------------------------------------------
 # DC_type = 'grad'
-# lambda_Rthetas = np.logspace(-1, 1, num=10).tolist()
+# lambda_Rthetas = np.logspace(-4, -1, num=10).tolist()
 # Network = 'DRUNet'
 # accelerated = True  # True pour entraînement accéléré, False pour entraînement complet
 # max_iter = 200
@@ -120,7 +120,7 @@ test_dataloader = DataLoader(test_dataset, batch_size=20, shuffle=False)
 #     # -------------------------------------------------------------------------------
 #     # Folder for saving model and parameters
 #     # -------------------------------------------------------------------------------
-#     path_folder = 'Unrolling_comparison/rician/' + f'DC_{DC_type}_lambda_Rtheta_{lambda_Rtheta}_sigma_denoiser_{sigma_denoiser}_n_iter_init_{n_iter}_lambda_dc_{lambda_dc}_init_train_{init_train}'
+#     path_folder = 'Unrolling_comparison/rician/noise_level_' + f'{sigma_noise}/' + f'DC_{DC_type}/' + f'lambda_Rtheta_{lambda_Rtheta}_sigma_denoiser_{sigma_denoiser}_n_iter_init_{n_iter}_lambda_dc_{lambda_dc}_init_train_{init_train}'
 #     os.makedirs(path_folder, exist_ok=True)
 
 #     # ---------------------------
@@ -206,13 +206,13 @@ test_dataloader = DataLoader(test_dataset, batch_size=20, shuffle=False)
 
 # # recherche du meilleur modèle (en fonction du PSNR) parmi tous les modèles entraînés
 # DC_type = 'grad'
-# lambda_Rthetas = np.logspace(-1., 1., num=10).tolist()
+# lambda_Rthetas = np.logspace(-4., -1., num=10).tolist()
 # best_PSNR = -float('inf')
 # best_model_path = None
 # for lambda_Rtheta, sigma_denoiser, n_iter, lambda_dc, init_train in product(lambda_Rthetas, sigma_denoising, n_iter_init, lambda_dcs, init_trains):
 #     if lambda_Rtheta == 10. and init_train == False:
 #         pass
-#     path_folder = 'Unrolling_comparison/rician/' + f'DC_{DC_type}_lambda_Rtheta_{lambda_Rtheta}_sigma_denoiser_{sigma_denoiser}_n_iter_init_{n_iter}_lambda_dc_{lambda_dc}_init_train_{init_train}'
+#     path_folder = 'Unrolling_comparison/rician/noise_level_' + f'{sigma_noise}/' + f'DC_{DC_type}/' + f'lambda_Rtheta_{lambda_Rtheta}_sigma_denoiser_{sigma_denoiser}_n_iter_init_{n_iter}_lambda_dc_{lambda_dc}_init_train_{init_train}'
 #     with open(os.path.join(path_folder, "results.txt"), "r") as f:
 #         lines = f.readlines()
 #         for line in lines:
@@ -231,25 +231,22 @@ test_dataloader = DataLoader(test_dataset, batch_size=20, shuffle=False)
 # # Paramètres (facilement modifiables)
 # # ------------------------------------------------------------------------------
 # DC_type = 'prox'
-# lambda_Rthetas = (5*np.logspace(1., 3., num=10)).tolist()
+# lambda_Rthetas = (5*np.logspace(2, 4, num=10)).tolist()
 # Network = 'DRUNet'
 # accelerated = True  # True pour entraînement accéléré, False pour entraînement complet
 # max_iter = 200
 # backtracking = False
 # sigma_denoising = np.linspace(0.01, 0.1, num=10).tolist()
-# n_iter_init = [20]
-# lambda_dcs = [5e-4]
-# init_trains = [True]
-# sigma_noise = 0.1
+# sigma_noises = [0.05, 0.1]
 
-# for lambda_Rtheta, sigma_denoiser, n_iter, lambda_dc, init_train in product(lambda_Rthetas, sigma_denoising, n_iter_init, lambda_dcs, init_trains):
-#     lambda_dc = min(lambda_dc, 1 / (5 * lambda_Rtheta))  # On s'assure que lambda_dc est suffisamment petit par rapport à lambda_Rtheta
+# for lambda_Rtheta, sigma_denoiser, sigma_noise in product(lambda_Rthetas, sigma_denoising, sigma_noises):
 #     # -------------------------------------------------------------------------------
 #     # Folder for saving model and parameters
 #     # -------------------------------------------------------------------------------
-#     path_folder = 'Unrolling_comparison/rician/' + f'DC_{DC_type}_lambda_Rtheta_{lambda_Rtheta}_sigma_denoiser_{sigma_denoiser}_n_iter_init_{n_iter}_lambda_dc_{lambda_dc}_init_train_{init_train}'
+#     lambda_dc = 1e-2 / lambda_Rtheta  # lambda_dc dépend de lambda_Rtheta pour éviter des valeurs trop grandes
+#     path_folder = 'Unrolling_comparison/rician/' + 'noise_level_' + str(sigma_noise) + f'/DC_{DC_type}/' + f'lambda_Rtheta_{lambda_Rtheta}_sigma_denoiser_{sigma_denoiser}_lambda_dc_{lambda_dc}'
 #     os.makedirs(path_folder, exist_ok=True)
-
+    
 #     # ---------------------------
 #     # Model definition
 #     # ---------------------------
@@ -268,50 +265,24 @@ test_dataloader = DataLoader(test_dataset, batch_size=20, shuffle=False)
 #         lambda_dc=lambda_dc, lambda_Rtheta=lambda_Rtheta,
 #         learn_lambda_dc=False, learn_lambda_Rtheta=False,
 #         gamma=0., eta=0.5,
-#         thresh=1e-5, max_iter=max_iter, 
+#         thresh=1e-4, max_iter=max_iter, 
 #         device=device, path_folder=path_folder, 
 #         sigma_noise=sigma_noise,
+#         sigma_denoiser=sigma_denoiser,
 #         theta_interpol=0.01,
 #         restart=True,
 #         B_restart=100,
 #         learn_theta_interpol=False,
 #         learn_B_restart=False)
-#     if init_train:
-#         init_train_params = {"epoch_pretraining" : n_iter, "sigma_pretraining" : 0.2}
-#     else:
-#         init_train_params = None
-#     # -------------------------------------------------------------------------------
-#     # Training
-#     # -------------------------------------------------------------------------------
+    
 #     pretrained_path = None
-#     train = False
-#     if train:
-#         model.train_model(
-#             train_loader=train_dataloader,
-#             val_loader=val_dataloader,
-#             accelerated=accelerated,
-#             init_train=init_train_params,
-#             JFB=True,
-#             K_JFB=3,
-#             lr=1e-5,
-#             eta_k=None,
-#             eta_TV=None,
-#             eta_l1=None,
-#             optimizer=torch.optim.Adam,
-#             optimizer_kwargs={"betas": (0.9, 0.999)},
-#             scheduler=None,
-#             scheduler_kwargs=None,
-#             max_patience=25,
-#             max_epochs=1,
-#             plot_interval=1,
-#             pretrained_path=pretrained_path)
 
 #     # -------------------------------------------------------------------------------
 #     # Evaluation
 #     # -------------------------------------------------------------------------------
 #     test = True
 #     if test:
-#         dict = model.evaluate(test_loader=val_dataloader, n_display=2, accelerated=accelerated, init_train=init_train_params, pretrained_path=pretrained_path, PnP=False)
+#         dict = model.evaluate(test_loader=val_dataloader, n_display=2, accelerated=accelerated, init_train=None, pretrained_path=pretrained_path, PnP=False)
 
 #     test_mse = dict["test_mse"]
 #     test_PSNR = dict["test_PSNR"]
@@ -323,7 +294,7 @@ test_dataloader = DataLoader(test_dataset, batch_size=20, shuffle=False)
 #         f.write(f"DC_type: {DC_type}\n")
 #         f.write(f"lambda_Rtheta: {lambda_Rtheta}\n")
 #         f.write(f"sigma_denoiser: {sigma_denoiser}\n")
-#         f.write(f"n_iter_init: {n_iter}\n")
+#         f.write(f"sigma_noise: {sigma_noise}\n")
 #         f.write(f"test_mse: {test_mse}\n")
 #         f.write(f"test_PSNR: {test_PSNR}\n")
 #         f.write(f"input_mse: {input_mse}\n")
@@ -333,9 +304,10 @@ test_dataloader = DataLoader(test_dataset, batch_size=20, shuffle=False)
 # DC_type = 'prox'
 # best_PSNR = -float('inf')
 # best_model_path = None
-# for lambda_Rtheta, sigma_denoiser, n_iter, lambda_dc, init_train in product(lambda_Rthetas, sigma_denoising, n_iter_init, lambda_dcs, init_trains):
-#     lambda_dc = min(lambda_dc, 1 / (5 * lambda_Rtheta))
-#     path_folder = 'Unrolling_comparison/rician/' + f'DC_{DC_type}_lambda_Rtheta_{lambda_Rtheta}_sigma_denoiser_{sigma_denoiser}_n_iter_init_{n_iter}_lambda_dc_{lambda_dc}_init_train_{init_train}'
+# sigma_noise = 0.1
+# for lambda_Rtheta, sigma_denoiser in product(lambda_Rthetas, sigma_denoising):
+#     lambda_dc = 1e-2 / lambda_Rtheta # lambda_dc dépend de lambda_Rtheta pour éviter des valeurs trop grandes
+#     path_folder = 'Unrolling_comparison/rician/' + 'noise_level_' + str(sigma_noise) + f'/DC_{DC_type}/' + f'lambda_Rtheta_{lambda_Rtheta}_sigma_denoiser_{sigma_denoiser}_lambda_dc_{lambda_dc}'
 #     with open(os.path.join(path_folder, "results.txt"), "r") as f:
 #         lines = f.readlines()
 #         for line in lines:
@@ -346,7 +318,7 @@ test_dataloader = DataLoader(test_dataset, batch_size=20, shuffle=False)
 #                     best_model_path = path_folder
 
 # # On écrit le meilleur modèle dans un fichier texte
-# with open("Unrolling_comparison/rician/best_model_prox.txt", "w") as f:
+# with open("Unrolling_comparison/rician/noise_level_" + str(sigma_noise) + "/best_model_prox.txt", "w") as f:
 #     f.write(f"Best model path: {best_model_path}\n")
 #     f.write(f"Best PSNR: {best_PSNR}\n")
 
@@ -364,7 +336,6 @@ test_dataloader = DataLoader(test_dataset, batch_size=20, shuffle=False)
 # learn_theta_interpol = True
 # learn_B_restart = False
 # B_restart = 100
-
 # path_folder = "Unrolling_comparison/DEQs/Rician/IDEQ_opt_01"
 # os.makedirs(path_folder, exist_ok=True)
 
@@ -456,62 +427,55 @@ test_dataloader = DataLoader(test_dataset, batch_size=20, shuffle=False)
 #     f.write(f"input_SSIM: {input_SSIM}\n")
 #     f.write(f"test_SSIM: {test_SSIM}\n")
 
-lambda_Rtheta = 10.
-sigma_denoiser = 0.02
+lambda_Rtheta = 834.
+sigma_denoiser = 0.03
 accelerated = True  # True pour entraînement accéléré, False pour entraînement complet
 max_iter = 200
 backtracking = False
 init_train = False
-lambda_dc = 0.03  # lambda_dc dépend de lambda_Rtheta pour éviter des valeurs trop grandes
+lambda_dc = 1e-2 / lambda_Rtheta  # lambda_dc dépend de lambda_Rtheta pour éviter des valeurs trop grandes
 CNNBlock_model = GSDRUNet(in_channels=3, out_channels=3, pretrained='./networks/GS_DRUNet_SPlus.ckpt', act_mode='s')
-DC_type = 'grad'
+DC_type = 'prox'
 learn_lambda_dc = False
 learn_lambda_Rtheta = True
 learn_theta_interpol = False
 learn_B_restart = False
 B_restart = 100
+sigma_noise = 0.1
 
-path_folder = "Unrolling_comparison/DEQs/Rician/RISP_taudeacrease_01_lr5e-6"
+path_folder = "Unrolling_comparison/DEQs/Rician/i-DEQ-P-01"
 os.makedirs(path_folder, exist_ok=True)
 
 model = DeepEquilibrium(
-                Network=CNNBlock_model, 
-                problem="rician",
-                DC_type=DC_type,
-                backtracking=backtracking,
-                lambda_dc=lambda_dc,
-                lambda_Rtheta=lambda_Rtheta,
-                learn_lambda_dc=learn_lambda_dc,
-                learn_lambda_Rtheta=learn_lambda_Rtheta,
-                gamma=0.1, eta=0.5,
-                thresh=1e-4, max_iter=max_iter, 
-                device=device, path_folder=path_folder, 
-                sigma_noise=sigma_noise,
-                sigma_denoiser=sigma_denoiser,
-                theta_interpol=0.2,
-                restart=True,
-                B_restart=B_restart,
-                learn_theta_interpol=learn_theta_interpol,
-                learn_B_restart=learn_B_restart
-            )
-
-if init_train:
-    init_train_params = {"epoch_pretraining" : 20, "sigma_pretraining" : 0.2, "tau0_pretraining" : 0.1}
-else:
-    init_train_params = None
+        Network=CNNBlock_model, 
+        problem="rician",
+        DC_type=DC_type,
+        backtracking=backtracking, 
+        lambda_dc=lambda_dc, lambda_Rtheta=lambda_Rtheta,
+        learn_lambda_dc=False, learn_lambda_Rtheta=False,
+        gamma=0.01, eta=0.5,
+        thresh=1e-4, max_iter=max_iter, 
+        device=device, path_folder=path_folder, 
+        sigma_noise=sigma_noise,
+        sigma_denoiser=sigma_denoiser,
+        theta_interpol=0.01,
+        restart=True,
+        B_restart=100,
+        learn_theta_interpol=False,
+        learn_B_restart=False)
 
 
 pretrained_path = None
-train = True
+train = False
 if train:
     model.train_model(
         train_loader=train_dataloader,
         val_loader=val_dataloader,
         accelerated=accelerated,
-        init_train=init_train_params,
+        init_train=None,
         JFB=True,
         K_JFB=0,
-        lr=5e-6,
+        lr=1e-5,
         eta_k=None,
         eta_TV=None,
         eta_l1=None,
@@ -519,20 +483,21 @@ if train:
         optimizer_kwargs={"betas": (0.9, 0.999)},
         scheduler=None,
         scheduler_kwargs=None,
-        max_patience=25,
+        max_patience=50,
         max_epochs=500,
         plot_interval=1,
         pretrained_path=pretrained_path
     )
 
-#pretrained_path = os.path.join(path_folder, "best_model.pth")
+pretrained_path = os.path.join(path_folder, "best_model.pth")
+# pretrained_path = None
 test = True
 if test:
     dict = model.evaluate(
         test_loader=test_dataloader,
         n_display=7,
         accelerated=accelerated,
-        init_train=init_train_params,
+        init_train=None,
         pretrained_path=pretrained_path,
         PnP=False
     )

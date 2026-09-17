@@ -15,7 +15,7 @@ class GridSearch:
     # =========================================================
     # 1. CONFIG
     # =========================================================
-    def compute_lambda_dc(self, R, lambda_dc):
+    def compute_lambda_dc(self, R):
         p = self.cfg["problem"]
         dc = self.cfg["DC_type"]
 
@@ -28,11 +28,14 @@ class GridSearch:
         elif p == "inpainting":
             return min(0.1, 1 / R)
 
+        elif p == "deblurring":
+            return min(0.1, 1 / R)
+
         elif p == "rician":
             if dc == "grad":
                 return 0.03
             else:
-                return 5e-4
+                return 1e-2 / R
 
         else:
             raise ValueError(p)
@@ -40,6 +43,8 @@ class GridSearch:
     def get_model_hyperparams(self):
         if self.cfg["problem"] == "rician":
             return dict(gamma=0.01, theta=0.01, restart=100, learn_R=False)
+        elif self.cfg["problem"] == "deblurring":
+            return dict(gamma=0.1, theta=0.2, restart=100, learn_R=False)
         else:
             return dict(gamma=0.1, theta=0.2, restart=5000, learn_R=False)
 
@@ -51,7 +56,6 @@ class GridSearch:
             self.cfg["lambda_Rtheta"],
             self.cfg["sigma_denoiser"],
             self.cfg["n_iter_init"],
-            self.cfg["lambda_dc"],
             self.cfg["init_train"],
         )
 
@@ -104,7 +108,7 @@ class GridSearch:
     # =========================================================
     def build_path(self, R, sigma, n_iter, lambda_dc, init_train):
         return (
-            f"Unrolling_comparison/{self.cfg['problem']}/"
+            f"grid_search/{self.cfg['problem']}"
             f"{self.cfg['DC_type']}_"
             f"R_{R:.2e}_"
             f"s_{sigma:.3f}_"
@@ -118,9 +122,9 @@ class GridSearch:
     # =========================================================
     def run(self):
 
-        for R, sigma, n_iter, lambda_dc, init_flag in self.generate_grid():
+        for R, sigma, n_iter, init_flag in self.generate_grid():
 
-            lambda_dc = self.compute_lambda_dc(R, lambda_dc)
+            lambda_dc= self.compute_lambda_dc(R)
 
             path = self.build_path(R, sigma, n_iter, lambda_dc, init_flag)
             os.makedirs(path, exist_ok=True)
@@ -162,21 +166,22 @@ class GridSearch:
 
             with open(os.path.join(root, "results.txt")) as f:
                 for line in f:
-                    if line.startswith("test_PSNR:"):
-                        psnr = float(line.split(":")[1])
+                    if line.startswith("test_PSNR: "):
+                        psnr = float(line.split(": ")[1])
                         if psnr > best_psnr:
                             best_psnr = psnr
                             best_path = root
 
         print("BEST:", best_path, best_psnr)
 
-def build_config(problem, DC_type, accelerated):
+def build_config(problem, DC_type, accelerated, sigma_noise=1.0):
 
     base = {
         "problem": problem,
         "DC_type": DC_type,
         "accelerated": accelerated,
         "device": "cuda:0",
+        "sigma_noise": sigma_noise/255,
         "train": False,
         "backtracking": False,
         "pretrained": "./networks/GS_DRUNet_SPlus.ckpt" if problem != "MRI" else "./networks/GSDRUNet_grayscale_torch.ckpt",
@@ -187,9 +192,8 @@ def build_config(problem, DC_type, accelerated):
             "lambda_Rtheta": (5*np.logspace(-1, 0, 10)).tolist(),
             "sigma_denoiser": np.linspace(0.01, 0.05, 5).tolist(),
             "max_iter": 200,
-            "sigma_noise": 1./255,
+            "sigma_noise": sigma_noise/255,
             "n_iter_init": [None],
-            "lambda_dc": [0.0],
             "init_train": [False],
         })
 
@@ -198,24 +202,32 @@ def build_config(problem, DC_type, accelerated):
             "lambda_Rtheta": (5*np.logspace(-1, 1, 10)).tolist(),
             "sigma_denoiser": np.linspace(0.01, 0.05, 5).tolist(),
             "max_iter": 200,
-            "sigma_noise": 5/255,
+            "sigma_noise": sigma_noise/255,
             "n_iter_init": [20],
-            "lambda_dc": [0.0],
             "init_train": [True],
         })
+
+    elif problem == "deblurring":
+            base.update({
+                "lambda_Rtheta": (5*np.logspace(-1, 0, 10)).tolist(),
+                "sigma_denoiser": np.linspace(0.01, 0.05, 5).tolist(),
+                "max_iter": 200,
+                "sigma_noise": sigma_noise/255,
+                "n_iter_init": [None],
+                "init_train": [False],
+            })
 
     elif problem == "rician":
         base.update({
             "lambda_Rtheta": (
                 np.logspace(-1, 1, 10).tolist()
                 if DC_type == "grad"
-                else (5*np.logspace(1, 3, 10)).tolist()
+                else (5*np.logspace(2, 4, 10)).tolist()
             ),
-            "sigma_denoiser": np.linspace(0.01, 0.1, 10).tolist(),
+            "sigma_denoiser": np.linspace(0.01, 0.05, 5).tolist(),
             "max_iter": 200,
-            "sigma_noise": 0.1,
-            "n_iter_init": [20],
-            "lambda_dc": [0.03] if DC_type == "grad" else [5e-4],
+            "sigma_noise": sigma_noise/255,
+            "n_iter_init": [None],
             "init_train": [False],
         })
 

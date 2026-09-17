@@ -508,8 +508,8 @@ test_dataloader = DataLoader(test_dataset, batch_size=20, shuffle=False)
 #     f.write(f"input_SSIM: {input_SSIM}\n")
 #     f.write(f"test_SSIM: {test_SSIM}\n")
 
-lambda_Rtheta = 0.65
-sigma_denoiser = 0.04
+lambda_Rtheta = 0.8
+sigma_denoiser = 0.02
 accelerated = True  # True pour entraînement accéléré, False pour entraînement complet
 andersen_acceleration = False
 cycle_andersen = False
@@ -517,23 +517,25 @@ m_andersen = 5
 max_iter = 300
 backtracking = False
 init_train = False
-lambda_dc = .5 # lambda_dc dépend de lambda_Rtheta pour éviter des valeurs trop grandes
+lambda_dc = 1 # lambda_dc dépend de lambda_Rtheta pour éviter des valeurs trop grandes
 CNNBlock_model = GSDRUNet(in_channels=1, out_channels=1, pretrained='networks/GSDRUNet_grayscale_torch.ckpt')
-DC_type = 'grad'
+# CNNBlock_model = GSDRUNet(in_channels=1, out_channels=1, pretrained='networks/retrained.pth')
+DC_type = 'prox'
 learn_lambda_dc = False
 learn_lambda_Rtheta = True
 learn_theta_interpol = False
 theta_interpol = 0.2
 B_restart = 100
 random_noise = False
-noise_level = 5./255
+noise_level = 1./255
 noise_level_bounds = (1/255, 25.5/255) # Lower bound has to be >0 for weighting of the loss reasons
 
 # -------------------------------------------------------------------------------
 # Dossier pour sauvegarde et paramètres du modèle
 # -------------------------------------------------------------------------------
 
-path_folder = "Unrolling_comparison/MRI/DEQ/tau_decrease_5255"
+path_folder = "Unrolling_comparison/MRI/DEQ/iDEQ_P_100"
+
 os.makedirs(path_folder, exist_ok=True)
 
 model = DeepEquilibrium(
@@ -580,7 +582,7 @@ if train:
             optimizer_kwargs={"betas": (0.9, 0.999)},
             scheduler=None,
             scheduler_kwargs=None,
-            max_patience=25,
+            max_patience=50,
             max_epochs=500,
             plot_interval=1,
             pretrained_path=pretrained,
@@ -593,7 +595,7 @@ if test:
                           n_display=7, 
                           accelerated=accelerated,
                           andersen_acceleration=andersen_acceleration,
-                          noise_test=25.5/255,
+                          noise_test=1./255,
                           init_train=None, 
                           pretrained_path=pretrained, 
                           PnP=False)

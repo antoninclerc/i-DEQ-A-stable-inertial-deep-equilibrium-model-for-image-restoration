@@ -11,7 +11,7 @@ import time
 from networks.DRUnet import GSDRUNet
 
 from utils import add_zero_channel, PSNR, ifft2c, image_2ch_to_magnitude, SSIM, show_image
-from models.data_consistency import DC_prox_MRI, DC_prox_inpainting, DC_prox_Rician
+from models.data_consistency import DC_prox_MRI, DC_prox_inpainting, DC_prox_Rician, DC_prox_deblurring
 from gen_data import get_dataloaders
 
 
@@ -23,8 +23,8 @@ class Config:
         self,
         lambda_=0.13,
         zeta=0.8,
-        diffusion_steps=20,
-        t_start=200,
+        diffusion_steps=200,
+        t_start=999,
         noise_level_img=1.,
         degradation="mri",
         device="cuda:0",
@@ -38,10 +38,16 @@ class Config:
         self.degradation = degradation
         if degradation == "mri":
             self.prox = DC_prox_MRI
+            self.mask = 'mask'
         elif degradation == "inpainting":
             self.prox = DC_prox_inpainting
+            self.mask = 'mask'
+        elif degradation == "deblurring":
+            self.prox = DC_prox_deblurring
+            self.mask = 'filter'
         else:
             self.prox = DC_prox_Rician
+            self.mask = 'mask'
 # =========================
 # Diffusion utilities
 # =========================
@@ -93,7 +99,7 @@ def restore(cfg: Config, dataloader):
 
         x_true = x_true.to(cfg.device)
         y = y.to(cfg.device)
-        mask = params['mask'].to(cfg.device)
+        mask = params[cfg.mask].to(cfg.device)
         if cfg.degradation != "rician":
             y = y + cfg.noise_level_img / 255.0 * torch.randn_like(y)
 
@@ -121,12 +127,12 @@ def restore(cfg: Config, dataloader):
         time_start = time.time()
         x = 2 * x0 - 1
 
-        x = torch.clip(
-            torch.sqrt(alphas[cfg.t_start]) * x
-            + torch.sqrt(1 - alphas[cfg.t_start]) * torch.randn_like(x),
-            0,
-            1,
-        )
+        x = (
+                torch.sqrt(alphas[cfg.t_start]) * x
+                + torch.sqrt(1 - alphas[cfg.t_start]) * torch.randn_like(x)
+            )
+
+        x = (x + 1) / 2
 
         with torch.no_grad():
             for i in tqdm(range(len(seq))):
@@ -162,6 +168,11 @@ def restore(cfg: Config, dataloader):
             print(f"Restoration took {time_end - time_start:.2f} seconds.")
 
             x_mag = torch.clamp(x, 0, 1)
+            x_true = torch.clamp(x_true, 0, 1)
+
+            if cfg.degradation == "deblurring":
+                x_mag = torch.roll(x_mag, shifts=(-1, -1), dims=(-2, -1))
+            
             if cfg.degradation == "mri":
                 x_mag = image_2ch_to_magnitude(x_mag)
                 x_true_mag = image_2ch_to_magnitude(x_true)
@@ -181,7 +192,7 @@ def restore(cfg: Config, dataloader):
     mean_psnr = np.mean(psnrs)
     mean_ssim = np.mean(ssim_list)
 
-    path_folder = 'DIFFPIR/lambda_{}_zeta_{}'.format(cfg.lambda_, cfg.zeta)
+    path_folder = 'DIFFPIR/{}/{}/lambda_{}_zeta_{}'.format(cfg.degradation, cfg.noise_level_img, cfg.lambda_, cfg.zeta)
     os.makedirs(path_folder, exist_ok=True)
 
     # Save results
@@ -210,6 +221,17 @@ def restore(cfg: Config, dataloader):
             )
         plt.tight_layout()
         plt.savefig(os.path.join(path_folder, f"test_reconstruction_only_{index}.pdf"), dpi=300)
+        plt.close()
+
+        plt.figure(figsize=(5,5))
+        ax = plt.subplot(1,1,1)
+        show_image(
+            ax,
+            torch.abs(x_true_mag[index] - x_mag[index]),
+            f"Difference Image",
+            )
+        plt.tight_layout()
+        plt.savefig(os.path.join(path_folder, f"test_difference_image_{index}.pdf"), dpi=300)
         plt.close()
 
 
@@ -254,7 +276,7 @@ def find_best_model(args, dataloader):
     zetas = np.linspace(args.zeta_min, args.zeta_max, args.n_zeta).tolist()
 
     for lambda_, zeta in product(lambdas, zetas):
-        path_folder = 'DIFFPIR/lambda_{}_zeta_{}'.format(lambda_, zeta)
+        path_folder = 'DIFFPIR/{}/{}/lambda_{}_zeta_{}'.format(args.problem, args.noise_level, lambda_, zeta)
         psnr_file = os.path.join(path_folder, 'psnr_results.txt')
 
         if os.path.exists(psnr_file):
@@ -286,7 +308,7 @@ def main():
     # -------------------------
     # global setup
     # -------------------------
-    parser.add_argument("--problem", choices=["mri", "inpainting", "rician"], required=True)
+    parser.add_argument("--problem", choices=["mri", "inpainting", "rician", "deblurring"], required=True)
     parser.add_argument("--mode", choices=["grid", "test"], required=True)
     parser.add_argument("--device", type=str, default="cuda:0")
 
@@ -343,6 +365,7 @@ def main():
             "val_path": "DATA/BSDS500/val",
             "test_path": "DATA/BSDS500/test",
             "sigma": args.noise_level / 255.0,
+            "kernel_size": 21,
         }
 
     train_loader, val_loader, test_loader, physics = get_dataloaders(

@@ -134,31 +134,31 @@ train_dataloader = DataLoader(train_dataset, batch_size=20, shuffle=True)
 val_dataloader = DataLoader(val_dataset, batch_size=10, shuffle=False)
 test_dataloader = DataLoader(test_dataset, batch_size=20, shuffle=False)
 
-# lambdas_Rtheta = (5 * np.logspace(-1.0, 0.0, num=10)).tolist()
-# sigmas_denoiser = np.linspace(0.03, 0.1, num=8).tolist()
-# n_iter_init = [False, True]
+lambdas_Rtheta = (5 * np.logspace(-1.0, 0.0, num=10)).tolist()
+sigmas_denoisers = np.linspace(0.03, 0.1, num=8).tolist()
+n_iter_init = [False]
 
-# for lambda_Rtheta, sigma_denoiser, init_train in product(lambdas_Rtheta, sigma_denoiser, n_iter_init):
+# for lambda_Rtheta, sigma_denoiser, init_train in product(lambdas_Rtheta, sigmas_denoisers, n_iter_init):
 
 #     accelerated = True  # True pour entraînement accéléré, False pour entraînement complet
 #     max_iter = 150
 #     backtracking = False
 #     lambda_dc = min(0.1, 1/lambda_Rtheta)  # Valeur initiale de lambda_dc, peut être ajustée
 #     CNNBlock_model = GSDRUNet(in_channels=3, out_channels=3, pretrained='./networks/GS_DRUNet_SPlus.ckpt', act_mode='s')
-#     DC_type = 'grad'
-#     learn_lambda_dc = True
-#     learn_lambda_Rtheta = True
+#     DC_type = 'prox'
+#     learn_lambda_dc = False
+#     learn_lambda_Rtheta = False
 #     learn_theta_interpol = False
 #     theta_interpol = 0.2
 #     B_restart = 100
 #     random_noise = False
-#     noise_level = 5/255
+#     noise_level = 5./255
 
-#     -------------------------------------------------------------------------------
-#     Dossier pour sauvegarde et paramètres du modèle
-#     -------------------------------------------------------------------------------
+#     # -------------------------------------------------------------------------------
+#     # Dossier pour sauvegarde et paramètres du modèle
+#     # -------------------------------------------------------------------------------
 
-#     path_folder = "Unrolling_comparison/Deblurring/multikernel/psf21/lambda_Rtheta_{:.4f}_sigma_denoiser_{:.4f}_init_train_{}".format(
+#     path_folder = "Unrolling_comparison/Deblurring/multikernel/psf21/5255/lambda_Rtheta_{:.4f}_sigma_denoiser_{:.4f}_init_train_{}".format(
 #         lambda_Rtheta, sigma_denoiser, init_train
 #     )
 
@@ -183,38 +183,15 @@ test_dataloader = DataLoader(test_dataset, batch_size=20, shuffle=False)
 #                     learn_theta_interpol=learn_theta_interpol,
 #                     learn_B_restart=False)
 
-#     -------------------------------------------------------------------------------
-#     Entraînement
-#     -------------------------------------------------------------------------------
+#     # -------------------------------------------------------------------------------
+#     # Entraînement
+#     # -------------------------------------------------------------------------------
 #     pretrained = None
 #     if init_train:
 #         init_train = {"epoch_pretraining" : 20, "sigma_pretraining" : 0.2}
 #     else:
 #         init_train = None
-
-#     train = False
-#     if train:
-#         model.train_model(
-#                 train_loader=train_dataloader,
-#                 val_loader=val_dataloader,
-#                 accelerated=accelerated,
-#                 init_train=init_train,
-#                 JFB=True,
-#                 K_JFB=0.,
-#                 lr=1e-5,
-#                 eta_k=None,
-#                 eta_TV=None,
-#                 eta_l1=None,
-#                 optimizer=torch.optim.Adam,
-#                 optimizer_kwargs={"betas": (0.9, 0.999)},
-#                 scheduler=None,
-#                 scheduler_kwargs=None,
-#                 max_patience=25,
-#                 max_epochs=500,
-#                 plot_interval=1,
-#                 pretrained_path=pretrained)
-
-#     pretrained = path_folder + "/best_model.pth"  # chemin vers le modèle pré-entraîné, si disponible
+#     pretrained = None
 #     test = True
 #     if test:
 #         dict = model.evaluate(test_loader=val_dataloader, 
@@ -258,11 +235,11 @@ test_dataloader = DataLoader(test_dataset, batch_size=20, shuffle=False)
 #         f.write(f"input_SSIM: {input_SSIM}\n")
 #         f.write(f"test_SSIM: {test_SSIM}\n")
 
-# Recherche de la meilleure combinaison de paramètres
+# # Recherche de la meilleure combinaison de paramètres
 # best_PSNR = -np.inf
 # best_params = None
-# for lambda_Rtheta, sigma_denoiser, init_train in product(lambdas_Rtheta, sigmas_denoiser, n_iter_init):
-#     path_folder = "Unrolling_comparison/Deblurring/multikernel/psf21/lambda_Rtheta_{:.4f}_sigma_denoiser_{:.4f}_init_train_{}".format(
+# for lambda_Rtheta, sigma_denoiser, init_train in product(lambdas_Rtheta, sigmas_denoisers, n_iter_init):
+#     path_folder = "Unrolling_comparison/Deblurring/multikernel/psf21/5255/lambda_Rtheta_{:.4f}_sigma_denoiser_{:.4f}_init_train_{}".format(
 #         lambda_Rtheta, sigma_denoiser, init_train
 #     )
 #     results_file = os.path.join(path_folder, "results.txt")
@@ -279,7 +256,7 @@ test_dataloader = DataLoader(test_dataset, batch_size=20, shuffle=False)
 # if best_params is not None:
 #     lambda_Rtheta, sigma_denoiser, init_train = best_params
 #     print(f"Best parameters found: lambda_Rtheta={lambda_Rtheta}, sigma_denoiser={sigma_denoiser}, init_train={init_train} with test_PSNR={best_PSNR}")
-#     with open("Unrolling_comparison/Deblurring/multikernel/psf21/best_params.txt", "w") as f:
+#     with open("Unrolling_comparison/Deblurring/multikernel/psf21/5255/best_params.txt", "w") as f:
 #         f.write('lambda_Rtheta: {:.4f}\n'.format(lambda_Rtheta))
 #         f.write('sigma_denoiser: {:.4f}\n'.format(sigma_denoiser))
 #         f.write('init_train: {}\n'.format(init_train))
@@ -290,17 +267,17 @@ test_dataloader = DataLoader(test_dataset, batch_size=20, shuffle=False)
 accelerated = True  # True pour entraînement accéléré, False pour entraînement complet
 max_iter = 300
 backtracking = False
-lambda_dc = 0.1  # Valeur initiale de lambda_dc, peut être ajustée
+lambda_dc = .5 # Valeur initiale de lambda_dc, peut être ajustée
 CNNBlock_model = GSDRUNet(in_channels=3, out_channels=3, pretrained='./networks/GS_DRUNet_SPlus.ckpt', act_mode='s')
-DC_type = 'grad'
+DC_type = 'prox'
 learn_lambda_dc = False
 learn_lambda_Rtheta = True
 learn_theta_interpol = False
 theta_interpol = 0.2
-B_restart = 100
+B_restart = 50
 random_noise = False
 noise_level = 5/255
-lambda_Rtheta= 1.4
+lambda_Rtheta= 0.84
 sigma_denoiser= 0.03
 init_train = None
 noise_level_bounds = (1/255, 25.5/255) # Lower bound has to be >0 for weighting of the loss reasons
@@ -310,9 +287,7 @@ random_noise = False
 # Dossier pour sauvegarde et paramètres du modèle
 # -------------------------------------------------------------------------------
 
-path_folder = "Unrolling_comparison/Deblurring/multikernel/psf21/lambda_Rtheta_{:.4f}_sigma_denoiser_{:.4f}_init_train_{}_bactrack".format(
-        lambda_Rtheta, sigma_denoiser, init_train
-)
+path_folder = "Unrolling_comparison/Deblurring/multikernel/psf21/iDEQ_5255"
 
 os.makedirs(path_folder, exist_ok=True)
 
@@ -323,7 +298,7 @@ model = DeepEquilibrium(
                     backtracking=backtracking, 
                     lambda_dc=lambda_dc, lambda_Rtheta=lambda_Rtheta,
                     learn_lambda_dc=learn_lambda_dc, learn_lambda_Rtheta=learn_lambda_Rtheta,
-                    gamma=0.01, eta=0.5,
+                    gamma=0.01, eta=0.2,
                     thresh=1e-4, max_iter=max_iter, 
                     device=device, path_folder=path_folder,
                     random_noise=random_noise,
@@ -364,7 +339,6 @@ if train:
                 pretrained_path=pretrained)
 
 pretrained = path_folder + "/best_model.pth"  # chemin vers le modèle pré-entraîné, si disponible
-
 test = True
 if test:
     dict = model.evaluate(test_loader=test_dataloader, 

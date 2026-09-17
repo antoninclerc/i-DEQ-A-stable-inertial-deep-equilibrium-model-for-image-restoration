@@ -8,7 +8,9 @@
 **/*.jpeg
 *.pdf
 **/Unrolling_comparison/
+**/results/
 **/DATA/
+**/datasets/
 **/*.h5
 **/Figures/
 **/DIFFPIR/

@@ -248,6 +248,8 @@ class DeepEquilibrium(nn.Module):
             
             train_sigma = self.sigma_denoiser
             train_backtracking = self.backtracking
+            train_B = self.B_restart
+            self.B_restart = 0  # Disable restart during pretraining for stability
             
             self.backtracking = False  # Disable backtracking during pretraining for stability
             self.sigma_denoiser = sigma_pretraining  # Use higher noise during pretraining for better convergence
@@ -373,10 +375,10 @@ class DeepEquilibrium(nn.Module):
 
                 norm_diff_prev = norm_diff
 
-                if patience_eps >= 15:
-                    print(f"Warning: eps has increased for {patience_eps} consecutive iterations. Possible divergence.")
-                    tau0 = tau0 * 0.5
-                    patience_eps = 0
+                # if patience_eps >= 15 and self.problem != 'MRI':
+                #     print(f"Warning: eps has increased for {patience_eps} consecutive iterations. Possible divergence.")
+                #     tau0 = tau0 * 0.5
+                #     patience_eps = 0
 
                 # --- restart (only accelerated) ---
                 if self.accelerated and self.B_restart > 0:
@@ -392,6 +394,7 @@ class DeepEquilibrium(nn.Module):
                 if total_iter > iter_pretraining and self.init_train is not None:
                     self.backtracking = train_backtracking  # Restore backtracking setting after pretraining
                     self.sigma_denoiser = train_sigma  # Restore denoiser noise level after pretraining
+                    self.B_restart = train_B  # Restore restart setting after pretraining
 
                     if total_iter == iter_pretraining + 1:
                         print(f"Pretraining complete. Resuming with backtracking={self.backtracking} and sigma_denoiser={self.sigma_denoiser}.")
@@ -626,7 +629,7 @@ class DeepEquilibrium(nn.Module):
                 epoch_iter_nums_val = []            
 
                 outputs, intermediates, stats = self.forward(batch_input, batch_mask)
-                
+                    
                 epoch_iter_nums.append(stats["iter_num"])
 
                 # 2) Compute loss
@@ -635,6 +638,7 @@ class DeepEquilibrium(nn.Module):
                 if JFB:
                     # JFB uses fixed-point z_fixed and single-step one_step internally
                     _, max_eigenvalue = jacobian_free_backpropagation(
+                        problem=self.problem,
                         z_fixed=outputs,
                         z_fixed_before=intermediates[-2] if len(intermediates) > 1 else outputs,  # Use previous intermediate as z_fixed_before for acceleration
                         mask=batch_mask,
@@ -677,6 +681,9 @@ class DeepEquilibrium(nn.Module):
                     # Standard backward on loss
                     loss = self.criterion(outputs, batch_target)
                     loss.backward()
+
+                if self.problem == "deblurring" and self.DC_type == "prox":
+                                    outputs = torch.roll(outputs, shifts=(-1, -1), dims=(-2, -1))
                 
                 self.optimizer.step()
 
@@ -740,6 +747,9 @@ class DeepEquilibrium(nn.Module):
                     batch_target = batch_target.to(self.device).float()     
 
                     outputs, _, stats = self.forward(batch_input, batch_mask)
+
+                    if self.problem == "deblurring" and self.DC_type == "prox":
+                        outputs = torch.roll(outputs, shifts=(-1, -1), dims=(-2, -1))
                         
                     epoch_iter_nums_val.append(stats["iter_num"])
 
@@ -933,6 +943,10 @@ class DeepEquilibrium(nn.Module):
                     batch_input_in = ifft2c(batch_input)
                 else:
                     batch_input_in = batch_input
+
+                if self.problem == "deblurring" and self.DC_type == "prox":
+                    outputs = torch.roll(outputs, shifts=(-1, -1), dims=(-2, -1))
+                
                 mse_list, psnr_list, ssim_list, _ = compute_batch_metrics(outputs, batch_target)
                 mse_input, psnr_input, ssim_input, _ = compute_batch_metrics(batch_input_in, batch_target)
 
@@ -954,6 +968,8 @@ class DeepEquilibrium(nn.Module):
 
                 for k in range(n_iter):
                     interm_k = intermediates[k]
+                    if self.problem == "deblurring" and self.DC_type == "prox":
+                        interm_k = torch.roll(interm_k, shifts=(-1, -1), dims=(-2, -1))
                     _, psnr_k, _, _ = compute_batch_metrics(interm_k, batch_target)
                     psnr_per_iter_accumulator[k] += float(np.mean(psnr_k))
 

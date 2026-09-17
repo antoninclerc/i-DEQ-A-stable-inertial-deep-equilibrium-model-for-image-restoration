@@ -93,7 +93,7 @@ def plot_psnr_time(data, labels, filename, linestyles, colors, markers):
     plt.yticks([27.5, 28.7], fontsize=14)
 
     plt.xlim(left=3000, right=100000)
-    plt.ylim(bottom=27.4, top=28.7)
+    plt.ylim(bottom=27.4, top=28.75)
 
     # plt.xscale('log')
 
@@ -135,25 +135,28 @@ def plot_metrics(log_files, labels, colors, linestyles, markers):
 
 if __name__ == "__main__":
     log_files = [
-        "Unrolling_comparison/MRI/DEQ/ELDER_maxiter_100/training_stats.txt",
-        "Unrolling_comparison/MRI/DEQ/ELDER_maxiter_200/training_stats.txt",
-        "Unrolling_comparison/MRI/DEQ/DEQ_RISP_maxiter_100_plus/training_stats.txt",
-        "Unrolling_comparison/MRI/DEQ/DEQ_RISP_maxiter_200_learn_all/training_stats.txt",
+        "Unrolling_comparison/MRI/DEQ/run_paper/ELDER_maxiter_100/training_stats.txt",
+        "Unrolling_comparison/MRI/DEQ/run_paper/ELDER_maxiter_200/training_stats.txt",
+        "Unrolling_comparison/MRI/DEQ/run_paper/DEQ_RISP_maxiter_100_plus/training_stats.txt",
+        "Unrolling_comparison/MRI/DEQ/run_paper/DEQ_RISP_maxiter_200_learn_all/training_stats.txt",
+        "Unrolling_comparison/MRI/DEQ/iDEQ_P_100/training_stats.txt"
     ]
     colors = [
     "blue",  # presque noir
     "lightblue",  # bleu atténué
     "lightcoral",  # rouge doux
     "lightcyan",  # cyan/gris
+    "lightgreen"  # vert pâle
 ]
-    linestyles = ['--', '--', '-', '-']
-    markers = ['o', 's', 'o', 's']
+    linestyles = ['--', '--', '-', '-', '-']
+    markers = ['o', 's', 'o', 's', 'o']
 
     labels = [
         "DEQ (100)",
         "DEQ (200)",
         "i-DEQ (100)",
         "i-DEQ (200)",
+        "i-DEQ-P (100)"
     ]
 
     plot_metrics(log_files, labels, colors, linestyles, markers)
