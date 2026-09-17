@@ -24,3 +24,7 @@
 **/plot_graph_mse_PSNR.py
 **/sum_times.py
 **/theta_graph.py
+**/sum_times.py
+
+**/download_BSDS500.py
+**/extract_data.py
