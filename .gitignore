@@ -1,11 +1,9 @@
-*.ckpt
-*.pth
-*.pt
 *.pdf
-*.h5
 *.png
 *.jpg
 *.jpeg
+*.ckpt
+*.pth
 
 **/__pycache__/
 **/Unrolling_comparison/
@@ -19,6 +17,8 @@
 **/main_MRI.py
 **/main_rician_noise.py
 **/main_inpainting.py
+**/retrained.pth
+**/GSDRUNet.ckpt
 
 **/plot_figures.py
 **/plot_graph_mse_PSNR.py
