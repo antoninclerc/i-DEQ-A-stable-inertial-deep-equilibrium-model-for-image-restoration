@@ -1,4 +1,3 @@
-import os
 import random
 import numpy as np
 import torch
@@ -73,7 +72,7 @@ def get_dataloaders(problem_type, config):
     # MRI
     # -------------------------
     if problem_type == "mri":
-        from deepinv.datasets import FastMRISliceDataset
+        from dinv.datasets import FastMRISliceDataset
 
         img_size = config["img_size"]
         acc = config["acceleration"]

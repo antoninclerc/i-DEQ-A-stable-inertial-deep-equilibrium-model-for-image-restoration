@@ -1,5 +1,4 @@
 import torch
-import torch.nn.functional as F
 from utils import (
     ifft2c, 
     fft2c, 
